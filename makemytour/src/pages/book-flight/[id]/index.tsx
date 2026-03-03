@@ -146,7 +146,9 @@ const BookFlightPage = () => {
       hour: "2-digit",
       minute: "2-digit",
     };
-    const date = new Date(dateString);
+    // Append local timezone indicator if the string is a bare date (YYYY-MM-DD)
+    const normalized = dateString.length === 10 ? dateString + "T00:00:00" : dateString;
+    const date = new Date(normalized);
     return date.toLocaleString("en-US", options);
   };
 
@@ -168,11 +170,16 @@ const BookFlightPage = () => {
   const handlebooking = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      // Pass the flight departure date (YYYY-MM-DD) to store as the travel date
+      const travelDate = flight?.departureTime
+        ? flight.departureTime.substring(0, 10)
+        : undefined;
       const data = await handleflightbooking(
         user?.id,
         flight?.id,
         quantity,
-        grandTotal
+        grandTotal,
+        travelDate
       );
       const updateuser = {
         ...user,

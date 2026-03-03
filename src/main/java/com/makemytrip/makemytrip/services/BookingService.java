@@ -23,7 +23,7 @@ public class BookingService {
     @Autowired
     private HotelRepository hotelRepository;
 
-    public Booking bookFlight(String userId,String flightId,int seats,double price){
+    public Booking bookFlight(String userId,String flightId,int seats,double price,String date){
         Optional<Users> usersOptional =userRepository.findById(userId);
         Optional<Flight> flightOptional =flightRepository.findById(flightId);
         if(usersOptional.isPresent() && flightOptional.isPresent()){
@@ -36,7 +36,17 @@ public class BookingService {
                 Booking booking=new Booking();
                 booking.setType("Flight");
                 booking.setBookingId(flightId);
-                booking.setDate(LocalDate.now().toString());
+                // Use provided date, fall back to flight departure date, then today
+                if(date != null && !date.isEmpty()){
+                    booking.setDate(date.length() > 10 ? date.substring(0, 10) : date);
+                } else if(flight.getDepartureTime() != null && !flight.getDepartureTime().isEmpty()){
+                    String depDate = flight.getDepartureTime().length() > 10 
+                        ? flight.getDepartureTime().substring(0, 10) 
+                        : flight.getDepartureTime();
+                    booking.setDate(depDate);
+                } else {
+                    booking.setDate(LocalDate.now().toString());
+                }
                 booking.setQuantity(seats);
                 booking.setTotalPrice(price);
                 user.getBookings().add(booking);
@@ -48,7 +58,7 @@ public class BookingService {
         }
         throw new RuntimeException("User or flight not found");
     }
-    public Booking bookhotel(String userId,String hotelId,int rooms,double price){
+    public Booking bookhotel(String userId,String hotelId,int rooms,double price,String date){
         Optional<Users> usersOptional =userRepository.findById(userId);
         Optional<Hotel> hotelOptional = hotelRepository.findById(hotelId);
         if(usersOptional.isPresent() && hotelOptional.isPresent()){
@@ -61,7 +71,12 @@ public class BookingService {
                 Booking booking=new Booking();
                 booking.setType("Hotel");
                 booking.setBookingId(hotelId);
-                booking.setDate(LocalDate.now().toString());
+                // Use provided date or fall back to today
+                if(date != null && !date.isEmpty()){
+                    booking.setDate(date.length() > 10 ? date.substring(0, 10) : date);
+                } else {
+                    booking.setDate(LocalDate.now().toString());
+                }
                 booking.setQuantity(rooms);
                 booking.setTotalPrice(price);
                 user.getBookings().add(booking);

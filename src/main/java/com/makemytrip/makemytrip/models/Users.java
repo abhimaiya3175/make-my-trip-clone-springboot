@@ -1,12 +1,14 @@
 package com.makemytrip.makemytrip.models;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.util.List;
 import java.util.ArrayList;
 @Document(collection = "users")
 public class Users {
     @Id
+    @JsonProperty("id")
     private String _id;
     private String firstName;
     private String lastName;

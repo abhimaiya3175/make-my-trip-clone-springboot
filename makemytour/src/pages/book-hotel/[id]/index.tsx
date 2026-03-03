@@ -118,11 +118,14 @@ const BookHotelPage = () => {
   const handlebooking = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      // Pass today's date as booking/check-in date (YYYY-MM-DD)
+      const checkInDate = new Date().toISOString().substring(0, 10);
       const data = await handlehotelbooking(
         user?.id,
         hotel?.id,
         quantity,
-        grandTotal
+        grandTotal,
+        checkInDate
       );
       const updateuser = {
         ...user,

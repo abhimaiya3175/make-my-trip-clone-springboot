@@ -3,6 +3,15 @@ import Loader from "@/components/Loader";
 import { SearchSelect } from "@/components/SearchSelect";
 import SignupDialog from "@/components/SignupDialog";
 import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Bus,
   Calendar,
@@ -17,10 +26,15 @@ import {
   Train,
   Umbrella,
   Users,
+  LogOut,
+  User,
+  FileX2,
 } from "lucide-react";
 import { useRouter } from "next/router";
 import { useEffect, useMemo, useState } from "react";
-import { useSelector } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
+import { clearUser } from "@/store";
+import Link from "next/link";
 
 export default function Home() {
   const [bookingtype, setbookingtype] = useState("flights");
@@ -34,6 +48,11 @@ export default function Home() {
   const [flight, setflight] = useState<any[]>([]);
   const user = useSelector((state: any) => state.user.user);
   const router = useRouter();
+  const dispatch = useDispatch();
+
+  const logout = () => {
+    dispatch(clearUser());
+  };
   const flightD = [
     { id: 1, from: "Delhi", to: "Mumbai", date: "2025-01-15", price: 5000 },
     { id: 2, from: "Mumbai", to: "Bengaluru", date: "2025-01-16", price: 4500 },
@@ -173,7 +192,9 @@ export default function Home() {
       hour: "2-digit",
       minute: "2-digit",
     };
-    const date = new Date(dateString);
+    // Append local timezone indicator if the string is a bare date (YYYY-MM-DD)
+    const normalized = dateString.length === 10 ? dateString + "T00:00:00" : dateString;
+    const date = new Date(normalized);
     return date.toLocaleString("en-US", options);
   };
   const handlebooknow = (id: any) => {
@@ -191,6 +212,66 @@ export default function Home() {
           'url("https://images.unsplash.com/photo-1464037866556-6812c9d1c72e?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2940&q=80")',
       }}
     >
+      {/* Home Page Header */}
+      <header className="backdrop-blur-md bg-white/80 py-3 sticky top-0 z-50 shadow-sm">
+        <div className="container mx-auto px-4 flex items-center justify-between">
+          <Link href="/" className="flex items-center space-x-2">
+            <Plane className="w-8 h-8 text-red-500" />
+            <span className="text-2xl font-bold text-black">MakeMyTour</span>
+          </Link>
+          <div className="flex items-center space-x-3">
+            {user ? (
+              <>
+                {user.role === "ADMIN" && (
+                  <Button variant="default" onClick={() => router.push("/admin")}>
+                    ADMIN
+                  </Button>
+                )}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+                      <Avatar className="h-8 w-8">
+                        <AvatarFallback>{user?.firstName?.charAt(0)}</AvatarFallback>
+                      </Avatar>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent className="w-56" align="end" forceMount>
+                    <DropdownMenuLabel className="font-normal">
+                      <div className="flex flex-col space-y-1">
+                        <p className="text-sm font-medium leading-none">{user?.firstName}</p>
+                        <p className="text-xs leading-none text-muted-foreground">{user?.email}</p>
+                      </div>
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => router.push("/profile")}>
+                      <User className="mr-2 h-4 w-4" />
+                      <span>Profile</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => router.push("/cancellations")}>
+                      <FileX2 className="mr-2 h-4 w-4" />
+                      <span>My Cancellations</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => logout()}>
+                      <LogOut className="mr-2 h-4 w-4" />
+                      <span>Log out</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </>
+            ) : (
+              <SignupDialog
+                trigger={
+                  <Button variant="outline" className="bg-blue-600 text-white hover:bg-blue-700">
+                    Sign Up
+                  </Button>
+                }
+              />
+            )}
+          </div>
+        </div>
+      </header>
+
       <main className="container mx-auto px-4 py-6">
         <nav className="bg-white rounded-xl shadow-lg mx-auto max-w-5xl mb-6 p-4 overflow-x-auto">
           <div className="flex justify-between items-center min-w-max space-x-8">

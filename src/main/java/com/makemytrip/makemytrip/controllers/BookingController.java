@@ -12,11 +12,11 @@ public class BookingController {
     private BookingService bookingService;
 
     @PostMapping("/flight")
-    public Users.Booking bookFlight(@RequestParam String userId,@RequestParam String flightId,@RequestParam int seats,@RequestParam double price){
-        return bookingService.bookFlight(userId,flightId,seats,price);
+    public Users.Booking bookFlight(@RequestParam String userId,@RequestParam String flightId,@RequestParam int seats,@RequestParam double price,@RequestParam(required = false) String date){
+        return bookingService.bookFlight(userId,flightId,seats,price,date);
     }
     @PostMapping("/hotel")
-    public Users.Booking bookhotel (@RequestParam String userId,@RequestParam String hotelId,@RequestParam int rooms,@RequestParam double price){
-        return bookingService.bookhotel(userId,hotelId,rooms,price);
+    public Users.Booking bookhotel (@RequestParam String userId,@RequestParam String hotelId,@RequestParam int rooms,@RequestParam double price,@RequestParam(required = false) String date){
+        return bookingService.bookhotel(userId,hotelId,rooms,price,date);
     }
 }

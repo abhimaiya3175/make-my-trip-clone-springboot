@@ -7,8 +7,12 @@ import Navbar from "@/components/Navbar";
 
 import { useEffect } from "react";
 import Footer from "@/components/Fotter";
+import { useRouter } from "next/router";
 
 const Myapp = ({ Component, pageProps }: AppProps) => {
+  const router = useRouter();
+  const isHomePage = router.pathname === "/";
+
   useEffect(() => {
     const storeduser = localStorage.getItem("user");
     if (storeduser) {
@@ -17,7 +21,7 @@ const Myapp = ({ Component, pageProps }: AppProps) => {
   }, []);
   return (
     <div className="min-h-screen ">
-      <Navbar />
+      {!isHomePage && <Navbar />}
       <Component {...pageProps} />
       <Footer/>
     </div>
