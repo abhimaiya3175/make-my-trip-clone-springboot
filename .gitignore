@@ -4,6 +4,14 @@ target/
 !**/src/main/**/target/
 !**/src/test/**/target/
 
+### Environment & Secrets ###
+.env
+.env.local
+.env.*.local
+*.key
+*.pem
+application-secrets.properties
+
 ### STS ###
 .apt_generated
 .classpath
@@ -31,3 +39,18 @@ build/
 
 ### VS Code ###
 .vscode/
+### IDE ###
+*.swp
+*.swo
+*~
+.DS_Store
+
+### Node & npm ###
+makemytour/node_modules/
+makemytour/.npm
+makemytour/npm-debug.log*
+makemytour/yarn-debug.log*
+makemytour/yarn-error.log*
+makemytour/.next/
+makemytour/out/
+makemytour/.vercel/

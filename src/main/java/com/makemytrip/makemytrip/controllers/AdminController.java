@@ -30,19 +30,21 @@ public class AdminController {
         return ResponseEntity.ok(users);
     }
     @PostMapping("/flight")
-    public Flight addflight(@RequestBody Flight flight){
-        return flightRepository.save(flight);
+    public ResponseEntity<Flight> addflight(@RequestBody Flight flight){
+        Flight savedFlight = flightRepository.save(flight);
+        return ResponseEntity.ok(savedFlight);
     }
 
     @PostMapping("/hotel")
-    public Hotel addhotel(@RequestBody Hotel hotel){
-        return hotelRepository.save(hotel);
+    public ResponseEntity<Hotel> addhotel(@RequestBody Hotel hotel){
+        Hotel savedHotel = hotelRepository.save(hotel);
+        return ResponseEntity.ok(savedHotel);
     }
     @PutMapping("flight/{id}")
     public ResponseEntity<Flight> editflight(@PathVariable String id, @RequestBody Flight updatedFlight){
-        Optional<Flight> flightOptional=flightRepository.findById(id);
+        Optional<Flight> flightOptional = flightRepository.findById(id);
         if(flightOptional.isPresent()){
-            Flight flight = flightOptional.get();
+            Flight flight = flightOptional.orElseThrow();
             flight.setFlightName(updatedFlight.getFlightName());
             flight.setFrom(updatedFlight.getFrom());
             flight.setTo(updatedFlight.getTo());
@@ -57,9 +59,9 @@ public class AdminController {
     }
     @PutMapping("hotel/{id}")
     public ResponseEntity<Hotel> editHotel (@PathVariable String id, @RequestBody Hotel updatedHotel){
-        Optional<Hotel> hotelOptional=hotelRepository.findById(id);
+        Optional<Hotel> hotelOptional = hotelRepository.findById(id);
         if(hotelOptional.isPresent()){
-            Hotel hotel = hotelOptional.get();
+            Hotel hotel = hotelOptional.orElseThrow();
             hotel.sethotelName(updatedHotel.gethotelName());
             hotel.setLocation(updatedHotel.getLocation());
             hotel.setAvailableRooms(updatedHotel.getAvailableRooms());

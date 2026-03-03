@@ -233,10 +233,25 @@ spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.security.ser
 
 **MongoDB Connection String Examples:**
 
+> ⚠️ **SECURITY WARNING**: Never commit credentials or connection strings with passwords to Git!
+
+Use environment variables instead:
+
 - **Local MongoDB**: `mongodb://localhost:27017/makemytrip`
-- **MongoDB with Authentication**: `mongodb://username:password@localhost:27017/makemytrip`
-- **MongoDB Atlas (Cloud)**: `mongodb+srv://username:password@cluster.mongodb.net/makemytrip`
 - **Docker MongoDB**: `mongodb://localhost:27017/makemytrip`
+- **MongoDB Atlas (Cloud)**: Use environment variables - see `.env.example`
+
+**Using Environment Variables (Recommended):**
+
+1. Create `.env.local` file in `src/main/resources/`:
+```properties
+spring.data.mongodb.uri=${MONGODB_URI}
+```
+
+2. Set environment variable before running:
+```powershell
+$env:MONGODB_URI = "mongodb+srv://username:password@cluster.mongodb.net/makemytrip"
+```
 
 #### Step 2: Set Java 21 Environment
 

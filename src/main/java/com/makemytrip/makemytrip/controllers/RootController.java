@@ -15,11 +15,13 @@ import java.util.List;
 @RestController
 @CrossOrigin(origins = "*")
 public class RootController {
-    @Autowired
-    private HotelRepository hotelRepository;
-
-    @Autowired
-    private FlightRepository flightRepository;
+    private final HotelRepository hotelRepository;
+    private final FlightRepository flightRepository;
+    
+    public RootController(HotelRepository hotelRepository, FlightRepository flightRepository) {
+        this.hotelRepository = hotelRepository;
+        this.flightRepository = flightRepository;
+    }
     @GetMapping("/")
     public String home() {
         return "✅ It's running on port 8080!";

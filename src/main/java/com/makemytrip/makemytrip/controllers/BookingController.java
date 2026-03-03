@@ -1,6 +1,5 @@
 package com.makemytrip.makemytrip.controllers;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import com.makemytrip.makemytrip.models.Users;
 import com.makemytrip.makemytrip.services.BookingService;
