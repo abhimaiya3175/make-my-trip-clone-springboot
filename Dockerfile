@@ -1,5 +1,5 @@
-# Use an official Maven image with Java 17 for building
-FROM maven:3.9.5-eclipse-temurin-17 AS build
+# Use an official Maven image with Java 21 for building
+FROM maven:3.9.5-eclipse-temurin-21 AS build
 
 # Set the working directory inside the container
 WORKDIR /app
@@ -10,8 +10,8 @@ COPY . .
 # Build the project without running tests
 RUN mvn clean package -DskipTests
 
-# Use a lightweight JDK 17 image for running the application
-FROM eclipse-temurin:17-jre
+# Use a lightweight JDK 21 image for running the application
+FROM eclipse-temurin:21-jre
 
 # Set the working directory inside the container
 WORKDIR /app

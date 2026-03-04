@@ -1,8 +1,15 @@
 HELP.md
 target/
 !.mvn/wrapper/maven-wrapper.jar
-!**/src/main/**/target/
-!**/src/test/**/target/
+!**/backend/src/main/**/target/
+!**/backend/src/test/**/target/
+
+### Backend Build ###
+backend/target/
+*.jar
+*.war
+*.ear
+*.class
 
 ### Environment & Secrets ###
 .env
@@ -34,23 +41,30 @@ application-secrets.properties
 /nbdist/
 /.nb-gradle/
 build/
-!**/src/main/**/build/
-!**/src/test/**/build/
+!**/backend/src/main/**/build/
+!**/backend/src/test/**/build/
 
 ### VS Code ###
 .vscode/
+
 ### IDE ###
 *.swp
 *.swo
 *~
 .DS_Store
 
-### Node & npm ###
-makemytour/node_modules/
-makemytour/.npm
-makemytour/npm-debug.log*
-makemytour/yarn-debug.log*
-makemytour/yarn-error.log*
-makemytour/.next/
-makemytour/out/
-makemytour/.vercel/
+### Frontend (Next.js) ###
+frontend/node_modules/
+frontend/.npm
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+frontend/.next/
+frontend/out/
+frontend/.vercel/
+frontend/.cache/
+frontend/dist/
+
+### OS ###
+Thumbs.db
+ehthumbs.db

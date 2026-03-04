@@ -50,7 +50,7 @@ net start MongoDB
 
 **3. Configure MongoDB Connection**
 
-Ensure `src/main/resources/application.properties` has:
+Ensure `backend/src/main/resources/application.properties` has:
 ```properties
 spring.data.mongodb.uri=mongodb://localhost:27017/makemytrip
 ```
@@ -78,7 +78,7 @@ $env:PATH = "$env:JAVA_HOME\bin;$env:PATH"
 
 ```powershell
 # Navigate to frontend directory
-cd e:\ProJect\make-my-trip-clone-springboot-main\make-my-trip-clone-springboot-main\makemytour
+cd e:\ProJect\make-my-trip-clone-springboot-main\make-my-trip-clone-springboot-main\frontend
 
 # Install dependencies (first time only)
 npm install
@@ -104,8 +104,9 @@ We've created convenient startup scripts for you:
 .\start-backend.ps1
 ```
 
-**Frontend (in makemytour folder):**
+**Frontend (in frontend folder):**
 ```powershell
+cd frontend
 .\start-frontend.ps1
 ```
 
@@ -174,40 +175,72 @@ Before running this application locally, ensure you have the following installed
 
 ```
 make-my-trip-clone-springboot-main/
-├── src/                          # Spring Boot backend source code
-│   ├── main/
-│   │   ├── java/com/makemytrip/makemytrip/
-│   │   │   ├── MakemytripApplication.java    # Main Spring Boot application
-│   │   │   ├── config/
-│   │   │   │   └── SecurityConfig.java       # Security configuration
-│   │   │   ├── controllers/
-│   │   │   │   ├── AdminController.java      # Admin endpoints
-│   │   │   │   ├── BookingController.java    # Booking management
-│   │   │   │   ├── RootController.java       # Root/public endpoints
-│   │   │   │   └── UserController.java       # User management
-│   │   │   ├── models/
-│   │   │   │   ├── Flight.java               # Flight entity
-│   │   │   │   ├── Hotel.java                # Hotel entity
-│   │   │   │   └── Users.java                # User entity
-│   │   │   ├── repositories/
-│   │   │   │   ├── FlightRepository.java     # Flight data access
-│   │   │   │   ├── HotelRepository.java      # Hotel data access
-│   │   │   │   └── UserRepository.java       # User data access
-│   │   │   └── services/
-│   │   │       ├── BookingService.java       # Booking business logic
-│   │   │       └── UserServices.java         # User business logic
-│   │   └── resources/
-│   │       └── application.properties        # Backend configuration
-│   └── test/                     # Test files
-├── makemytour/                   # Next.js frontend application
+├── backend/                      # Spring Boot backend (Java 21)
 │   ├── src/
-│   │   ├── components/          # React components
-│   │   ├── pages/               # Next.js pages
+│   │   ├── main/
+│   │   │   ├── java/com/makemytrip/
+│   │   │   │   ├── MakemytripApplication.java    # Main Spring Boot app
+│   │   │   │   ├── config/
+│   │   │   │   │   ├── SecurityConfig.java       # BCrypt password encoder
+│   │   │   │   │   └── WebConfig.java            # CORS configuration
+│   │   │   │   └── modules/                      # Feature-based modules
+│   │   │   │       ├── auth/                     # Authentication & users
+│   │   │   │       │   ├── controller/AuthController.java
+│   │   │   │       │   ├── service/AuthService.java
+│   │   │   │       │   ├── repository/UserRepository.java
+│   │   │   │       │   ├── model/User.java
+│   │   │   │       │   └── dto/                  # Login/Signup DTOs
+│   │   │   │       ├── flights/                  # Flight management
+│   │   │   │       │   ├── controller/FlightController.java
+│   │   │   │       │   ├── service/FlightService.java
+│   │   │   │       │   ├── repository/FlightRepository.java
+│   │   │   │       │   └── model/Flight.java
+│   │   │   │       ├── hotels/                   # Hotel management
+│   │   │   │       ├── booking/                  # Booking management
+│   │   │   │       ├── cancellation/             # Cancellation & refunds
+│   │   │   │       ├── reviews/                  # Review system
+│   │   │   │       ├── flightstatus/             # Flight tracking
+│   │   │   │       ├── seatroom/                 # Seat/room selection
+│   │   │   │       ├── pricing/                  # Dynamic pricing
+│   │   │   │       └── recommendation/           # Recommendations
+│   │   │   └── resources/
+│   │   │       ├── application.properties        # Backend config
+│   │   │       └── data.sql                      # Sample data (optional)
+│   │   └── test/                 # Test files
+│   └── target/                   # Build output (gitignored)
+├── frontend/                     # Next.js frontend (React 19)
+│   ├── src/
+│   │   ├── components/          # React components (feature-based)
+│   │   │   ├── auth/            # Login, Signup forms
+│   │   │   ├── flights/         # Flight components
+│   │   │   ├── hotels/          # Hotel components
+│   │   │   ├── booking/         # Booking components
+│   │   │   ├── cancellation/    # Refund components
+│   │   │   ├── reviews/         # Review components
+│   │   │   └── ui/              # Shadcn/UI components
+│   │   ├── pages/               # Next.js pages (routing)
+│   │   │   ├── auth/            # Login/Signup pages
+│   │   │   ├── flights/         # Flight search & status
+│   │   │   ├── hotels/          # Hotel search
+│   │   │   ├── booking/         # Booking confirmation
+│   │   │   └── profile/         # User profile
+│   │   ├── services/            # API service layer
+│   │   │   ├── authService.js   # Authentication APIs
+│   │   │   ├── flightService.js # Flight APIs
+│   │   │   ├── hotelService.js  # Hotel APIs
+│   │   │   └── bookingService.js # Booking APIs
+│   │   ├── hooks/               # Custom React hooks
+│   │   ├── store/               # Redux store
 │   │   └── styles/              # CSS styles
 │   ├── public/                  # Static files
-│   └── package.json             # Frontend dependencies
+│   ├── package.json             # Frontend dependencies
+│   └── start-frontend.ps1       # Frontend startup script
+├── .mvn/                        # Maven wrapper
 ├── pom.xml                      # Maven configuration
-├── mvnw / mvnw.cmd              # Maven Wrapper scripts
+├── mvnw / mvnw.cmd              # Maven wrapper scripts
+├── Dockerfile                   # Docker build (Java 21)
+├── start-backend.ps1            # Backend startup script
+├── .env.example                 # Environment variables template
 └── README.md                    # This file
 ```
 
@@ -217,7 +250,7 @@ make-my-trip-clone-springboot-main/
 
 #### Step 1: Configure MongoDB Connection
 
-Edit `src/main/resources/application.properties`:
+Edit `backend/src/main/resources/application.properties`:
 
 ```properties
 spring.application.name=makemytrip
@@ -227,8 +260,11 @@ server.port=8080
 spring.data.mongodb.uri=mongodb://localhost:27017/makemytrip
 spring.data.mongodb.database=makemytrip
 
-# Security (disabled for development)
-spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration
+# CORS Configuration
+spring.web.cors.allowed-origins=http://localhost:3000
+
+# Logging (optional)
+logging.level.com.makemytrip=INFO
 ```
 
 **MongoDB Connection String Examples:**
@@ -243,7 +279,12 @@ Use environment variables instead:
 
 **Using Environment Variables (Recommended):**
 
-1. Create `.env.local` file in `src/main/resources/`:
+1. Create `.env` file in project root (see `.env.example`):
+```properties
+MONGODB_URI=mongodb://localhost:27017/makemytrip
+```
+
+2. Reference in `backend/src/main/resources/application.properties`:
 ```properties
 spring.data.mongodb.uri=${MONGODB_URI}
 ```
@@ -322,7 +363,7 @@ curl http://localhost:8080
 #### Step 1: Navigate to Frontend Directory
 
 ```bash
-cd makemytour
+cd frontend
 ```
 
 #### Step 2: Install Dependencies
@@ -355,7 +396,7 @@ Open [http://localhost:3000](http://localhost:3000) in your browser to see the a
 
 ### Backend Configuration
 
-Edit `src/main/resources/application.properties`:
+Edit `backend/src/main/resources/application.properties`:
 
 ```properties
 # Application Name
@@ -368,54 +409,76 @@ server.port=8080
 spring.data.mongodb.uri=mongodb://localhost:27017/makemytrip
 spring.data.mongodb.database=makemytrip
 
-# Security Configuration
-spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration
+# CORS Configuration
+spring.web.cors.allowed-origins=http://localhost:3000
 
 # Logging (optional)
-logging.level.com.makemytrip=DEBUG
+logging.level.com.makemytrip=INFO
 logging.level.org.springframework.data.mongodb=DEBUG
 ```
 
 ### Frontend Configuration
 
-The frontend connects to the backend API. If you change the backend port, update the API base URL in the frontend configuration.
+The frontend connects to the backend API at `http://localhost:8080`. If you change the backend port, update the API base URL in `frontend/src/utils/api.js`:
+
+```javascript
+import axios from "axios";
+
+const api = axios.create({
+  baseURL: "http://localhost:8080", // Update this if backend port changes
+});
+
+export default api;
+```
 
 ## 🔌 API Endpoints
 
-### Public Endpoints
+### Authentication Endpoints
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/` | Root endpoint |
-| GET | `/api/flights` | Get all flights |
-| GET | `/api/hotels` | Get all hotels |
+| POST | `/user/signup` | Register new user |
+| POST | `/user/login` | User login |
+| GET | `/user/email` | Get user by email |
+| POST | `/user/edit` | Edit user profile |
 
-### User Endpoints
+### Flight Endpoints
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/api/users/register` | Register new user |
-| POST | `/api/users/login` | User login |
-| GET | `/api/users/profile` | Get user profile |
+| GET | `/flight` | Get all flights |
+| POST | `/admin/flight` | Add new flight (admin) |
+| PUT | `/admin/flight/:id` | Update flight (admin) |
+
+### Hotel Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/hotel` | Get all hotels |
+| POST | `/admin/hotel` | Add new hotel (admin) |
+| PUT | `/admin/hotel/:id` | Update hotel (admin) |
 
 ### Booking Endpoints
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/api/bookings/flight` | Book a flight |
-| POST | `/api/bookings/hotel` | Book a hotel |
-| GET | `/api/bookings/user/:userId` | Get user bookings |
+| POST | `/api/booking/flight` | Book a flight |
+| POST | `/api/booking/hotel` | Book a hotel |
+| GET | `/api/booking/user/:userId` | Get user bookings |
+
+### Cancellation & Refund Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/cancellation/request` | Request booking cancellation |
+| GET | `/api/cancellation/user/:userId` | Get user cancellations |
+| GET | `/api/cancellation/refund/:bookingId` | Get refund tracker |
 
 ### Admin Endpoints
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/api/admin/flight` | Add new flight |
-| POST | `/api/admin/hotel` | Add new hotel |
-| PUT | `/api/admin/flight/:id` | Update flight |
-| PUT | `/api/admin/hotel/:id` | Update hotel |
-| DELETE | `/api/admin/flight/:id` | Delete flight |
-| DELETE | `/api/admin/hotel/:id` | Delete hotel |
+| GET | `/admin/users` | Get all users |
 
 ## 🐛 Troubleshooting
 
@@ -630,7 +693,7 @@ Write-Host "Starting MakeMyTrip Backend (Java 21)..." -ForegroundColor Green
 & "$env:JAVA_HOME\bin\java.exe" -jar target\makemytrip-0.0.1-SNAPSHOT.jar
 ```
 
-**Create `start-frontend.ps1` in makemytour folder:**
+**Create `start-frontend.ps1` in frontend folder:**
 ```powershell
 Write-Host "Starting MakeMyTrip Frontend..." -ForegroundColor Green
 npm run dev
@@ -642,7 +705,7 @@ npm run dev
 .\start-backend.ps1
 
 # Terminal 2: Start frontend
-cd makemytour
+cd frontend
 .\start-frontend.ps1
 ```
 
@@ -659,7 +722,7 @@ cd makemytour
 
 **Frontend Tests:**
 ```bash
-cd makemytour
+cd frontend
 npm run test
 ```
 
@@ -675,7 +738,7 @@ npm run test
 
 **Frontend:**
 ```bash
-cd makemytour
+cd frontend
 npm run build
 npm start
 ```
@@ -688,16 +751,18 @@ npm start
 
 **Frontend:**
 ```bash
-cd makemytour
+cd frontend
 npm run lint
 ```
 
 ## 📝 Additional Notes
 
-- **Security**: Security is currently disabled for development. Enable it for production by removing the exclude configuration.
-- **CORS**: Configure CORS in `SecurityConfig.java` if frontend and backend are on different domains.
-- **Environment Variables**: Use environment variables for sensitive data (MongoDB credentials, API keys).
-- **Java 21 Features**: This project is upgraded to Java 21 LTS for improved performance and modern language features.
+- **Architecture**: Project uses feature-based modular architecture for better code organization and maintainability.
+- **Package Structure**: Backend package is `com.makemytrip.modules.*` with separate modules for auth, flights, hotels, booking, cancellation, etc.
+- **Security**: BCrypt password encoding configured in `SecurityConfig.java`. CORS configured in `WebConfig.java`.
+- **Environment Variables**: Use `.env` file for sensitive data (MongoDB credentials, API keys). See `.env.example`.
+- **Java 21**: This project uses Java 21 LTS for improved performance and modern language features.
+- **Services Layer**: Frontend uses a services layer (`frontend/src/services/`) for clean API separation.
 
 ## 🤝 Contributing
 
