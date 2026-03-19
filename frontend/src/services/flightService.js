@@ -6,6 +6,7 @@ export const getflight = async () => {
     return res.data;
   } catch (error) {
     console.log(error);
+    return [];
   }
 };
 

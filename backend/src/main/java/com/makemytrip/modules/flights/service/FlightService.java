@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Optional;
 
 @Service
+@SuppressWarnings("null")
 public class FlightService {
     @Autowired
     private FlightRepository flightRepository;

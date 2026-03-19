@@ -13,13 +13,15 @@ import Loader from "../Loader";
 const FlightList = ({ onSelect }: any) => {
   const [flight, setflight] = useState<any[]>([]);
   const [loading, setloading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     const fetchflight = async () => {
       try {
+        setError(null);
         const data = await getflight();
         setflight(data);
-      } catch (error) {
-        console.error(error);
+      } catch (err: any) {
+        setError(err?.message || "Failed to load flights");
       } finally {
         setloading(false);
       }
@@ -29,6 +31,9 @@ const FlightList = ({ onSelect }: any) => {
   
   if (loading) {
     return <Loader />;
+  }
+  if (error) {
+    return <p className="text-red-500 text-center py-4">{error}</p>;
   }
   return (
     <div>

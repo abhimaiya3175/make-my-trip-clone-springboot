@@ -38,6 +38,10 @@ import { useDispatch, useSelector } from "react-redux";
 import SignupDialog from "@/components/SignupDialog";
 import Loader from "@/components/Loader";
 import { setUser } from "@/store";
+import RoomGrid from "@/components/Hotel/RoomGrid";
+import PriceFreezeButton from "@/components/pricing/PriceFreezeButton";
+import PriceHistoryChart from "@/components/pricing/PriceHistoryChart";
+
 const BookHotelPage = () => {
   const [quantity, setQuantity] = useState(1);
   const router = useRouter();
@@ -51,21 +55,44 @@ const BookHotelPage = () => {
     const fetchhotels = async () => {
       try {
         const data = await gethotel();
-        const filteredData = data.filter((hotel: any) => hotel.id === id);
-        sethotels(filteredData);
+        if (data && Array.isArray(data)) {
+          const filteredData = data.filter((hotel: any) => hotel.id === id);
+          sethotels(filteredData);
+        }
       } catch (error) {
-        console.error("Error fetching flights:", error);
+        console.error("Error fetching hotels:", error);
       } finally {
         setLoading(false);
       }
     };
-    fetchhotels();
-  }, []);
+
+    if (id) {
+      fetchhotels();
+    }
+  }, [id]);
 
   if (loading) {
     return <Loader />;
   }
-  const hotel = hotels[0];
+
+  const hotel = hotels && hotels.length > 0 ? hotels[0] : null;
+
+  if (!hotel) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Hotel Not Found</h1>
+          <p className="text-gray-600 mb-4">The hotel you're looking for doesn't exist.</p>
+          <button
+            onClick={() => router.push("/hotels")}
+            className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600"
+          >
+            Back to Hotels
+          </button>
+        </div>
+      </div>
+    );
+  }
   const hotelData = {
     name: "Magnum Resorts- Near Candolim Beach",
     rating: 3,
@@ -106,20 +133,24 @@ const BookHotelPage = () => {
   const handleQuantityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     e.preventDefault();
     const value = Number.parseInt(e.target.value);
-    setQuantity(
-      isNaN(value) ? 1 : Math.max(1, Math.min(value, hotel.availableRooms))
-    );
+    if (hotel) {
+      setQuantity(
+        isNaN(value) ? 1 : Math.max(1, Math.min(value, hotel.availableRooms))
+      );
+    }
   };
 
-  const totalPrice = hotel?.pricePerNight * quantity;
-  const totalTaxes = hotelData?.room.taxes * quantity;
-  const totalDiscounts = hotelData?.room.discountedPrice * quantity;
+  const totalPrice = (hotel?.pricePerNight || 0) * quantity;
+  const totalTaxes = (hotelData?.room.taxes || 0) * quantity;
+  const totalDiscounts = (hotelData?.room.discountedPrice || 0) * quantity;
   const grandTotal = totalPrice + totalTaxes - totalDiscounts;
   const handlebooking = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      // Pass today's date as booking/check-in date (YYYY-MM-DD)
-      const checkInDate = new Date().toISOString().substring(0, 10);
+      // Pass a date 7 days in the future to allow cancellation testing
+      const futureDate = new Date();
+      futureDate.setDate(futureDate.getDate() + 7);
+      const checkInDate = futureDate.toISOString().substring(0, 10);
       const data = await handlehotelbooking(
         user?.id,
         hotel?.id,
@@ -202,6 +233,10 @@ const BookHotelPage = () => {
               value={quantity}
               onChange={handleQuantityChange}
             />
+          </div>
+          <div className="md:col-span-2 mt-4 bg-gray-50 p-4 rounded-xl border">
+            <h3 className="font-semibold text-gray-800 mb-2">Select Your Room Type</h3>
+            <RoomGrid hotelId={hotel?.id as string} userId={user?.id as string} />
           </div>
         </div>
         <div className="bg-gray-100 rounded-lg p-4">
@@ -342,6 +377,27 @@ const BookHotelPage = () => {
                   </div>
                 ))}
                 <button className="text-blue-500">+ 31 Amenities</button>
+              </div>
+            </div>
+
+            {/* Price History & Freeze */}
+            <div className="bg-white rounded-xl shadow-sm p-6 mb-8 mt-6 border">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-lg font-bold flex items-center">
+                  <CreditCard className="w-5 h-5 mr-2 text-blue-500" />
+                  Dynamic Pricing & Price Freeze
+                </h2>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <h3 className="font-semibold mb-2 text-sm text-gray-700">Price Trend</h3>
+                  <PriceHistoryChart entityId={hotel?.id as string} entityType="HOTEL" />
+                </div>
+                <div className="flex flex-col justify-center items-center bg-gray-50 rounded-xl p-4 border border-dashed border-gray-300">
+                  <Home className="w-8 h-8 text-blue-300 mb-2" />
+                  <p className="text-sm text-gray-600 mb-4 text-center">Lock in the current price and avoid future demand hikes! Your rate will be guaranteed.</p>
+                  <PriceFreezeButton entityId={hotel?.id as string} entityType="HOTEL" userId={user?.id} currentPrice={grandTotal} />
+                </div>
               </div>
             </div>
           </div>

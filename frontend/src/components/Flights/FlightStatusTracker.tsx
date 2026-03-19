@@ -1,42 +1,88 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useRouter } from "next/router";
+import { getFlightStatus } from "@/services/flightStatusService";
+import FlightTimeline from "./FlightTimeline";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 
 interface FlightStatusData {
-  flightNumber: string;
-  status: string;
-  departure: string;
-  arrival: string;
-  departureTime: string;
-  arrivalTime: string;
-  gate: string;
+  flightId: string;
+  airline: string;
+  origin: string;
+  destination: string;
+  scheduledDeparture: string;
+  estimatedDeparture: string;
+  status: "ON_TIME" | "DELAYED" | "BOARDING" | "LANDED" | "CANCELLED";
+  delayMinutes: number;
+  delayReason: string | null;
+  lastUpdated: string;
 }
 
 const FlightStatusTracker: React.FC = () => {
+  const router = useRouter();
+  const { flightId: queryFlightId } = router.query;
+  
   const [flightNumber, setFlightNumber] = useState("");
   const [status, setStatus] = useState<FlightStatusData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [lastStatus, setLastStatus] = useState<string | null>(null);
 
-  const handleSearch = async () => {
-    if (!flightNumber.trim()) return;
+  const STATUS_COLORS = {
+    "ON_TIME": "bg-green-100 text-green-800 border-green-300",
+    "DELAYED": "bg-yellow-100 text-yellow-800 border-yellow-300",
+    "BOARDING": "bg-blue-100 text-blue-800 border-blue-300",
+    "LANDED": "bg-gray-100 text-gray-800 border-gray-300",
+    "CANCELLED": "bg-red-100 text-red-800 border-red-300",
+  };
+
+  const fetchStatus = async (fId: string) => {
+    if (!fId) return;
     setLoading(true);
     setError("");
     try {
-      const res = await fetch(`http://localhost:8080/api/flight-status/${flightNumber}`);
-      if (res.ok) {
-        const data = await res.json();
-        setStatus(data);
-      } else {
-        setError("Flight not found");
-        setStatus(null);
+      const data = await getFlightStatus(fId);
+      
+      // Show toast if status changed
+      if (lastStatus && data.status !== lastStatus) {
+        // Simple alert for now - can be replaced with toast library
+        alert(`Flight ${fId} status changed: ${lastStatus} → ${data.status}`);
       }
-    } catch (err) {
-      setError("Unable to fetch flight status");
+      
+      setStatus(data);
+      setLastStatus(data.status);
+    } catch (err: any) {
+      setError(err.response?.data?.message || "Flight not found");
+      setStatus(null);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Auto-fetch if flightId in URL
+  useEffect(() => {
+    if (queryFlightId && typeof queryFlightId === "string") {
+      setFlightNumber(queryFlightId);
+      fetchStatus(queryFlightId);
+    }
+  }, [queryFlightId]);
+
+  // Poll every 30 seconds
+  useEffect(() => {
+    if (!status) return;
+    
+    const interval = setInterval(() => {
+      fetchStatus(status.flightId);
+    }, 30000);
+    
+    return () => clearInterval(interval);
+  }, [status]);
+
+  const handleSearch = () => {
+    if (flightNumber.trim()) {
+      fetchStatus(flightNumber.trim());
     }
   };
 
@@ -49,7 +95,8 @@ const FlightStatusTracker: React.FC = () => {
             id="flightNumber"
             value={flightNumber}
             onChange={(e) => setFlightNumber(e.target.value)}
-            placeholder="Enter flight number (e.g., AI-101)"
+            placeholder="Enter flight number (e.g., AI101)"
+            onKeyPress={(e) => e.key === "Enter" && handleSearch()}
           />
         </div>
         <Button onClick={handleSearch} className="mt-6" disabled={loading}>
@@ -62,32 +109,67 @@ const FlightStatusTracker: React.FC = () => {
       {status && (
         <Card>
           <CardHeader>
-            <CardTitle>Flight {status.flightNumber}</CardTitle>
+            <CardTitle className="flex items-center justify-between">
+              <span>{status.airline} {status.flightId}</span>
+              <span className={`text-sm px-3 py-1 rounded-full border ${STATUS_COLORS[status.status]}`}>
+                {status.status.replace("_", " ")}
+              </span>
+            </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2">
-            <div className="flex justify-between">
-              <span className="text-gray-500">Status</span>
-              <span className={`font-semibold ${
-                status.status === "On Time" ? "text-green-500" :
-                status.status === "Delayed" ? "text-red-500" :
-                "text-yellow-500"
-              }`}>{status.status}</span>
+          <CardContent className="space-y-3">
+            <div className="flex justify-between items-center">
+              <div>
+                <p className="text-sm text-gray-500">From</p>
+                <p className="font-semibold text-lg">{status.origin}</p>
+              </div>
+              <div className="text-center text-gray-400">→</div>
+              <div className="text-right">
+                <p className="text-sm text-gray-500">To</p>
+                <p className="font-semibold text-lg">{status.destination}</p>
+              </div>
             </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">Departure</span>
-              <span>{status.departure} - {status.departureTime}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">Arrival</span>
-              <span>{status.arrival} - {status.arrivalTime}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">Gate</span>
-              <span>{status.gate || "TBA"}</span>
+            
+            <div className="border-t pt-3 space-y-2">
+              <div className="flex justify-between">
+                <span className="text-gray-500">Scheduled Departure</span>
+                <span className="font-semibold">
+                  {new Date(status.scheduledDeparture).toLocaleString()}
+                </span>
+              </div>
+              {status.estimatedDeparture && (
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Estimated Departure</span>
+                  <span className="font-semibold">
+                    {new Date(status.estimatedDeparture).toLocaleString()}
+                  </span>
+                </div>
+              )}
+              {status.delayMinutes > 0 && (
+                <>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Delay</span>
+                    <span className="font-semibold text-orange-600">
+                      {status.delayMinutes} minutes
+                    </span>
+                  </div>
+                  {status.delayReason && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Reason</span>
+                      <span className="text-sm">{status.delayReason}</span>
+                    </div>
+                  )}
+                </>
+              )}
+              <div className="flex justify-between text-xs text-gray-400 pt-2 border-t">
+                <span>Last updated</span>
+                <span>{new Date(status.lastUpdated).toLocaleTimeString()}</span>
+              </div>
             </div>
           </CardContent>
         </Card>
       )}
+
+      {status && <FlightTimeline flightId={status.flightId} />}
     </div>
   );
 };

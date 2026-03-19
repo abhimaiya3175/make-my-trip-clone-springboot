@@ -1,24 +1,50 @@
 package com.makemytrip.modules.flightstatus.controller;
 
-import com.makemytrip.modules.flightstatus.model.FlightStatus;
+import com.makemytrip.modules.flightstatus.dto.FlightStatusResponse;
+import com.makemytrip.modules.flightstatus.dto.TimelineResponse;
 import com.makemytrip.modules.flightstatus.service.FlightStatusService;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/flight-status")
-@CrossOrigin(origins = "*")
+@RequiredArgsConstructor
 public class FlightStatusController {
-    @Autowired
-    private FlightStatusService flightStatusService;
-
+    
+    private final FlightStatusService service;
+    
     @GetMapping("/{flightId}")
-    public ResponseEntity<FlightStatus> getFlightStatus(@PathVariable String flightId) {
-        FlightStatus status = flightStatusService.getFlightStatus(flightId);
-        if (status != null) {
-            return ResponseEntity.ok(status);
+    public ResponseEntity<?> getFlightStatus(@PathVariable String flightId) {
+        try {
+            FlightStatusResponse response = service.getStatus(flightId);
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(404).body(new ErrorResponse(e.getMessage()));
         }
-        return ResponseEntity.notFound().build();
     }
+    
+    @GetMapping("/{flightId}/timeline")
+    public ResponseEntity<?> getTimeline(@PathVariable String flightId) {
+        try {
+            TimelineResponse response = service.getTimeline(flightId);
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(404).body(new ErrorResponse(e.getMessage()));
+        }
+    }
+    
+    @GetMapping
+    public ResponseEntity<Page<FlightStatusResponse>> listAllStatuses(
+        @RequestParam(defaultValue = "0") int page,
+        @RequestParam(defaultValue = "10") int size
+    ) {
+        Page<FlightStatusResponse> response = service.listAll(PageRequest.of(page, size));
+        return ResponseEntity.ok(response);
+    }
+    
+    // Simple error response class
+    private record ErrorResponse(String message) {}
 }

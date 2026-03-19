@@ -14,13 +14,15 @@ import Loader from "../Loader";
 const HotelList = ({ onSelect }: any) => {
   const [hotel, sethotel] = useState<any[]>([]);
   const [loading, setloading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     const fetchhotel = async () => {
       try {
+        setError(null);
         const data = await gethotel();
         sethotel(data);
-      } catch (error) {
-        console.error(error);
+      } catch (err: any) {
+        setError(err?.message || "Failed to load hotels");
       } finally {
         setloading(false);
       }
@@ -30,6 +32,9 @@ const HotelList = ({ onSelect }: any) => {
   
   if (loading) {
     return <Loader />;
+  }
+  if (error) {
+    return <p className="text-red-500 text-center py-4">{error}</p>;
   }
   return (
     <div>

@@ -1,0 +1,22 @@
+﻿[INFO] Scanning for projects...
+[INFO] 
+[INFO] ---------------------< com.makemytrip:makemytrip >----------------------
+[INFO] Building makemytrip 0.0.1-SNAPSHOT
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- clean:3.4.0:clean (default-clean) @ makemytrip ---
+[INFO] Deleting E:\ProJect\make-my-trip-clone-springboot-main\make-my-trip-clone-springboot-main\target
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD FAILURE
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  1.905 s
+[INFO] Finished at: 2026-03-06T23:35:53+05:30
+[INFO] ------------------------------------------------------------------------
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-clean-plugin:3.4.0:clean (default-clean) on project makemytrip: Failed to clean project: Failed to delete E:\ProJect\make-my-trip-clone-springboot-main\make-my-trip-clone-springboot-main\target\makemytrip-0.0.1-SNAPSHOT.jar -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoExecutionException

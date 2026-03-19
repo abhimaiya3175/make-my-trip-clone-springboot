@@ -29,7 +29,7 @@ import {
   edithotel,
   getuserbyemail,
 } from "@/api";
-import HotelList from "@/components/Hotel/Hotel";
+import HotelList from "@/components/hotels/HotelCard";
 const mockFlights = [
   {
     _id: "1",

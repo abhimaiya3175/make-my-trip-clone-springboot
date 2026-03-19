@@ -156,13 +156,17 @@ export default function Home() {
 
   const cityOptions = useMemo(() => {
     const cities = new Set<string>();
-    flight.forEach((flight) => {
-      cities.add(flight.from);
-      cities.add(flight.to);
-    });
-    hotel.forEach((hotel) => {
-      cities.add(hotel.location);
-    });
+    if (Array.isArray(flight)) {
+      flight.forEach((f) => {
+        cities.add(f.from);
+        cities.add(f.to);
+      });
+    }
+    if (Array.isArray(hotel)) {
+      hotel.forEach((h) => {
+        cities.add(h.location);
+      });
+    }
     return Array.from(cities).map((city) => ({ value: city, label: city }));
   }, [flight, hotel]);
 
@@ -185,6 +189,7 @@ export default function Home() {
     }
   };
   const formatDate = (dateString: string): string => {
+    if (!dateString) return "N/A";
     const options: Intl.DateTimeFormatOptions = {
       year: "numeric",
       month: "long",
@@ -553,9 +558,8 @@ const WonderCard = ({ title, imageUrl }: any) => {
 function NavItem({ icon, text, active = false, onClick }: any) {
   return (
     <button
-      className={`flex flex-col items-center p-2 rounded-lg transition-colors ${
-        active ? "text-blue-500" : "text-gray-600 hover:text-blue-500"
-      }`}
+      className={`flex flex-col items-center p-2 rounded-lg transition-colors ${active ? "text-blue-500" : "text-gray-600 hover:text-blue-500"
+        }`}
       onClick={onClick}
     >
       {icon}

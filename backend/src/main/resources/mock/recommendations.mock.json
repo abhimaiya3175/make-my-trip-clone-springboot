@@ -1,0 +1,82 @@
+[
+  {
+    "userId": "user-101",
+    "itemType": "HOTEL",
+    "itemId": "hotel-goa-beach-01",
+    "score": 0.91,
+    "reason": "You previously booked beach destinations and highly rated Goa stays.",
+    "createdAt": "2026-03-05T17:55:00"
+  },
+  {
+    "userId": "user-101",
+    "itemType": "FLIGHT",
+    "itemId": "flight-BLR-DPS-20260320",
+    "score": 0.86,
+    "reason": "Users with similar booking patterns also booked Bali flights in March.",
+    "createdAt": "2026-03-05T17:55:00"
+  },
+  {
+    "userId": "user-101",
+    "itemType": "HOTEL",
+    "itemId": "hotel-ooty-hills-03",
+    "score": 0.84,
+    "reason": "You recently searched for hill stations and weekend getaways.",
+    "createdAt": "2026-03-05T17:56:00"
+  },
+  {
+    "userId": "user-102",
+    "itemType": "FLIGHT",
+    "itemId": "flight-BLR-GOA-20260318",
+    "score": 0.89,
+    "reason": "Frequent short vacation flights from Bangalore to Goa.",
+    "createdAt": "2026-03-05T17:56:00"
+  },
+  {
+    "userId": "user-102",
+    "itemType": "HOTEL",
+    "itemId": "hotel-goa-resort-07",
+    "score": 0.87,
+    "reason": "Users who booked this flight also booked beach resorts nearby.",
+    "createdAt": "2026-03-05T17:57:00"
+  },
+  {
+    "userId": "user-103",
+    "itemType": "FLIGHT",
+    "itemId": "flight-DEL-BLR-20260322",
+    "score": 0.82,
+    "reason": "Recommended based on frequent travel between Delhi and Bangalore.",
+    "createdAt": "2026-03-05T17:57:00"
+  },
+  {
+    "userId": "user-103",
+    "itemType": "HOTEL",
+    "itemId": "hotel-blr-business-02",
+    "score": 0.80,
+    "reason": "Business travelers often stay in this hotel near tech parks.",
+    "createdAt": "2026-03-05T17:58:00"
+  },
+  {
+    "userId": "user-104",
+    "itemType": "HOTEL",
+    "itemId": "hotel-manali-snow-01",
+    "score": 0.88,
+    "reason": "You searched for winter destinations and mountain resorts.",
+    "createdAt": "2026-03-05T17:58:00"
+  },
+  {
+    "userId": "user-104",
+    "itemType": "FLIGHT",
+    "itemId": "flight-DEL-KUL-20260325",
+    "score": 0.83,
+    "reason": "Users with similar interests also booked Kuala Lumpur trips.",
+    "createdAt": "2026-03-05T17:59:00"
+  },
+  {
+    "userId": "user-105",
+    "itemType": "HOTEL",
+    "itemId": "hotel-kerala-backwater-05",
+    "score": 0.90,
+    "reason": "You previously booked nature retreats and wellness resorts.",
+    "createdAt": "2026-03-05T18:00:00"
+  }
+]

@@ -1,6 +1,28 @@
 # MakeMyTrip Clone - Full Stack Application
 
-A full-stack travel booking application built with Spring Boot (Java 21) backend and Next.js frontend, featuring flight and hotel booking capabilities.
+A full-stack travel booking application built with Spring Boot (Java 17) backend and Next.js frontend, featuring flight and hotel booking capabilities with advanced features.
+
+## Implemented Features
+
+- **Review & Rating System** — Star ratings, review CRUD, helpful votes, flagging, owner replies, URL-based photo attachments, moderation workflow
+- **Live Flight Status** — Mock status provider with simulated delays, boarding, cancellation; auto-refresh polling (30s); in-app status change alert; timeline history
+- **Seat / Room Selection** — Interactive seat map with FIRST/BUSINESS/ECONOMY classes; hotel room grid grouped by type; lock/select/confirm flow; premium surcharges; user preference persistence
+- **Dynamic Pricing Engine** — Rule-based multipliers (weekend, holiday, last-minute, high demand, early bird); hourly price snapshots; price history charts via Recharts; 24-hour price freeze with countdown
+- **AI-Powered Recommendations** — Basic collaborative filtering; user event tracking (VIEW/SEARCH/BOOK); feedback loop (LIKE/SAVE/NOT_INTERESTED); personalized explanations; mock data bootstrap
+- **Security** — Spring Security filter chain, CORS policy, stateless sessions, BCrypt password encoding
+- **Testing** — 42 backend tests passing (Mockito + JUnit 5)
+
+## Feature Completion Snapshot (Updated: 15/03/2026)
+
+- Cancellation & Refunds: done (cancel from dashboard, auto-refund policy, partial cancellation/refund, reason dropdown, refund tracker)
+- Review & Rating System: mostly done
+   remaining: true file upload pipeline for photos is not implemented (current flow uses image URLs)
+- Live Flight Status (Mock API): mostly done
+   remaining: browser/system push notifications are not implemented; estimated arrival updates are not implemented (estimated departure is shown)
+- Seat/Room Selection: mostly done
+   remaining: 3D room preview is not implemented
+- Dynamic Pricing Engine: done
+- AI Recommendations: done
 
 ## 📋 Table of Contents
 
@@ -474,11 +496,118 @@ export default api;
 | GET | `/api/cancellation/user/:userId` | Get user cancellations |
 | GET | `/api/cancellation/refund/:bookingId` | Get refund tracker |
 
+### Review & Rating Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/reviews` | Create a review |
+| GET | `/api/reviews?entityType=&entityId=` | List reviews (sorted) |
+| PUT | `/api/reviews/:id` | Update a review |
+| DELETE | `/api/reviews/:id` | Delete a review |
+| POST | `/api/reviews/:id/helpful` | Vote helpful |
+| POST | `/api/reviews/:id/flag` | Flag inappropriate |
+| POST | `/api/reviews/:id/reply` | Reply to review |
+
+### Live Flight Status Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/flight-status/:flightId` | Get current flight status |
+| GET | `/api/flight-status/:flightId/timeline` | Get status timeline history |
+| GET | `/api/flight-status` | List all flight statuses (paginated) |
+| GET | `/api/flight-status/stream/:flightId` | SSE stream for live updates |
+
+### Seat / Room Selection Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/seatroom/seats/flight/:flightId` | Get all seats for a flight |
+| GET | `/api/seatroom/seats/flight/:flightId/available` | Get available seats |
+| POST | `/api/seatroom/seats/:seatId/lock` | Lock a seat (10-min hold) |
+| POST | `/api/seatroom/seats/:seatId/release` | Release seat lock |
+| POST | `/api/seatroom/seats/:seatId/confirm` | Confirm seat booking |
+| GET | `/api/seatroom/rooms/hotel/:hotelId` | Get all rooms for a hotel |
+| GET | `/api/seatroom/rooms/hotel/:hotelId/available` | Get available rooms |
+| POST | `/api/seatroom/rooms/:roomId/lock` | Lock a room (10-min hold) |
+| POST | `/api/seatroom/rooms/:roomId/release` | Release room lock |
+| POST | `/api/seatroom/rooms/:roomId/confirm` | Confirm room booking |
+| GET | `/api/seatroom/preferences/:userId` | Get user seat/room preferences |
+| PUT | `/api/seatroom/preferences` | Save user preferences |
+
+### Dynamic Pricing Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/pricing/:entityType/:entityId?userId=` | Get current dynamic price |
+| GET | `/api/pricing/:entityType/:entityId/history?days=7` | Get price history |
+| POST | `/api/pricing/freeze` | Freeze current price (24h) |
+| GET | `/api/pricing/freeze/user/:userId` | Get user's active freezes |
+
+### AI Recommendation Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/recommendations/user/:userId?itemType=` | Get personalized recommendations |
+| GET | `/api/recommendations/similar/:itemType/:itemId` | Get similar items |
+| POST | `/api/recommendations/events` | Record user event (VIEW/SEARCH/BOOK) |
+| POST | `/api/recommendations/feedback` | Submit feedback (LIKE/SAVE/NOT_INTERESTED) |
+| GET | `/api/recommendations/:itemId/explain?userId=` | Get recommendation explanation |
+
 ### Admin Endpoints
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/admin/users` | Get all users |
+
+## 🎬 Feature Demo Steps
+
+> Ensure both backend (`:8080`) and frontend (`:3000`) are running before trying these demos.
+
+### 1. Review & Rating System
+
+1. Sign up / log in at `http://localhost:3000`.
+2. Book a flight or hotel so you have a booking to review.
+3. Navigate to **http://localhost:3000/reviews/review**.
+4. Select the entity type (FLIGHT or HOTEL) and entity ID.
+5. Choose a star rating (1-5), write a review, optionally add photo URLs.
+6. Click **Submit** — the review appears in the review list.
+7. Other users can vote "Helpful", flag inappropriate reviews, or reply.
+
+### 2. Live Flight Status Tracker
+
+1. Go to **http://localhost:3000/flight-status**.
+2. Enter a flight number (e.g. `AI101`) in the search box and click **Track Flight**.
+3. The status card displays: airline, route, scheduled/estimated departure, and a coloured badge (ON_TIME / DELAYED / BOARDING / LANDED / CANCELLED).
+4. Status auto-refreshes every 45 seconds — if the status changes a toast alert appears.
+5. Click **View Timeline** to see the full status history.
+
+### 3. Seat / Room Selection
+
+1. From the home page search for flights or hotels.
+2. Click **Book** on a flight → the booking page loads with an interactive **seat map**.
+   - Green = available, Red = taken, Orange = locked by another user.
+   - Click a seat to lock it (held for 10 minutes).
+   - Click **Confirm** to finalize.
+3. Click **Book** on a hotel → the booking page loads with a **room grid** grouped by type (Deluxe / Suite / Standard).
+   - Room locking and confirmation work the same way.
+4. Your seat/room preferences are remembered for future bookings.
+
+### 4. Dynamic Pricing & Price Freeze
+
+1. On any flight/hotel booking page a **price badge** shows the current dynamic price with multiplier factors (weekend, high demand, etc.).
+2. Click the **Price History** tab to see a Recharts line chart of price changes over the last 7 days.
+3. Click **Freeze Price** to lock the current price for 24 hours — a countdown timer appears.
+4. The frozen price persists on page refresh; when the timer expires the badge reverts to the live price.
+
+### 5. AI-Powered Recommendations
+
+1. Log in and browse / search / book a few flights and hotels to generate activity events.
+2. Navigate to **http://localhost:3000/recommendations/suggestions**.
+3. Personalized recommendations appear as cards with scores, explanations, and prices.
+4. Click **Like** or **Save** to boost similar suggestions, or **Not Interested** to suppress them.
+5. Click the **Why?** tooltip to see a plain-language explanation of why the item was recommended.
+
+---
 
 ## 🐛 Troubleshooting
 
@@ -679,6 +808,42 @@ db.users.find()
 ```
 
 ## 🛠️ Development
+
+### Running Tests
+
+```powershell
+# Run all backend unit tests (41 tests)
+.\mvnw.cmd test
+
+# Run specific test classes
+.\mvnw.cmd test -Dtest="FlightStatusServiceTest,SeatRoomServiceTest,PricingServiceTest,RecommendationServiceTest"
+```
+
+Tests cover:
+- **FlightStatusServiceTest** (5 tests) — status lookup, not-found handling, delay info
+- **SeatRoomServiceTest** (15 tests) — lock/release/confirm for seats and rooms, conflict detection, optimistic locking, preferences
+- **PricingServiceTest** (11 tests) — base price, demand multipliers, entity type filtering, freeze lifecycle, history
+- **RecommendationServiceTest** (10 tests) — direct recommendations, collaborative filtering, feedback upsert, explanations
+
+**Frontend Unit Tests (27 tests):**
+```powershell
+cd frontend
+npm test              # Run all Jest tests
+npm run test:watch    # Watch mode
+npm run test:coverage # With coverage report
+```
+
+Frontend tests cover: ErrorBoundary, FlightStatusTracker, SeatMap, PriceFreezeButton, RecommendationsSection.
+
+**Cypress E2E Tests (5 specs):**
+```powershell
+cd frontend
+npx cypress install   # First-time binary download
+npm run cypress:open   # Interactive runner
+npm run cypress:run    # Headless CI runner
+```
+
+E2E specs: reviews, flight-status, seat-selection, price-freeze, recommendations.
 
 ### Startup Scripts (Optional)
 

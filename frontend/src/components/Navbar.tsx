@@ -1,6 +1,17 @@
 import React from "react";
 import SignupDialog from "./SignupDialog";
-import { LogOut, Plane, User, FileX2, Home, Building2, ClipboardList } from "lucide-react";
+import {
+  LogOut,
+  Plane,
+  User,
+  FileX2,
+  Home,
+  Building2,
+  ClipboardList,
+  Armchair,
+  BadgeIndianRupee,
+  MessageSquareText,
+} from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 import {
   DropdownMenu,
@@ -27,12 +38,18 @@ const Navbar = () => {
 
   const navLinks = [
     { href: "/", label: "Home", icon: <Home className="w-4 h-4" /> },
-    { href: "/#flights", label: "Flights", icon: <Plane className="w-4 h-4" /> },
-    { href: "/#hotels", label: "Hotels", icon: <Building2 className="w-4 h-4" /> },
+    { href: "/flights", label: "Flights", icon: <Plane className="w-4 h-4" /> },
+    { href: "/hotels", label: "Hotels", icon: <Building2 className="w-4 h-4" /> },
   ];
 
   const authNavLinks = [
-    { href: "/profile", label: "My Bookings", icon: <ClipboardList className="w-4 h-4" /> },
+    { href: "/bookings", label: "Bookings", icon: <ClipboardList className="w-4 h-4" /> },
+    { href: "/seat-room", label: "Seat & Room", icon: <Armchair className="w-4 h-4" /> },
+    { href: "/pricing", label: "Pricing", icon: <BadgeIndianRupee className="w-4 h-4" /> },
+    { href: "/flight-status", label: "Flight Status", icon: <Plane className="w-4 h-4" /> },
+    { href: "/recommendations/suggestions", label: "Recommendations", icon: <Building2 className="w-4 h-4" /> },
+    { href: "/reviews/review", label: "Reviews", icon: <MessageSquareText className="w-4 h-4" /> },
+    { href: "/cancellations", label: "Cancellations", icon: <FileX2 className="w-4 h-4" /> },
     { href: "/profile", label: "Profile", icon: <User className="w-4 h-4" /> },
   ];
 
@@ -51,11 +68,10 @@ const Navbar = () => {
             <Link
               key={link.label}
               href={link.href}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                router.pathname === link.href
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${router.pathname === link.href
                   ? "text-red-600 bg-red-50"
                   : "text-gray-600 hover:text-red-600 hover:bg-gray-50"
-              }`}
+                }`}
             >
               {link.icon}
               {link.label}
@@ -66,11 +82,10 @@ const Navbar = () => {
               <Link
                 key={link.label}
                 href={link.href}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  router.pathname === link.href
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${router.pathname === link.href
                     ? "text-red-600 bg-red-50"
                     : "text-gray-600 hover:text-red-600 hover:bg-gray-50"
-                }`}
+                  }`}
               >
                 {link.icon}
                 {link.label}

@@ -1,33 +1,36 @@
 package com.makemytrip.modules.recommendation.model;
 
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
+import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
+@Data
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
 @Document(collection = "recommendations")
+@CompoundIndex(name = "user_item_idx", def = "{'userId': 1, 'itemType': 1, 'itemId': 1}")
+@CompoundIndex(name = "user_generated_idx", def = "{'userId': 1, 'createdAt': -1}")
 public class Recommendation {
     @Id
     private String id;
+
+    @Indexed
     private String userId;
     private String itemId;
-    private String itemType;
-    private double score;
-    private String reason;
-    private List<String> tags;
+    private String itemType;    // "FLIGHT" or "HOTEL"
+    private double score;       // 0.0 - 1.0 relevance score
+    private String reason;      // human-readable explanation
+    private List<String> tags;  // e.g. ["beach", "weekend", "budget"]
 
-    public String getId() { return id; }
-    public void setId(String id) { this.id = id; }
-    public String getUserId() { return userId; }
-    public void setUserId(String userId) { this.userId = userId; }
-    public String getItemId() { return itemId; }
-    public void setItemId(String itemId) { this.itemId = itemId; }
-    public String getItemType() { return itemType; }
-    public void setItemType(String itemType) { this.itemType = itemType; }
-    public double getScore() { return score; }
-    public void setScore(double score) { this.score = score; }
-    public String getReason() { return reason; }
-    public void setReason(String reason) { this.reason = reason; }
-    public List<String> getTags() { return tags; }
-    public void setTags(List<String> tags) { this.tags = tags; }
+    @Indexed(expireAfter = "86400s")
+    private LocalDateTime createdAt;
 }

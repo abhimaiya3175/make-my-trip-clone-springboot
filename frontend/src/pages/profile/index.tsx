@@ -20,7 +20,7 @@ import {
 import { useDispatch, useSelector } from "react-redux";
 import { useRouter } from "next/router";
 import { clearUser, setUser } from "@/store";
-import { editprofile, getUserCancellations } from "@/api";
+import { editprofile, getUserCancellations, getUserBookings } from "@/api";
 import CancellationDialog from "@/components/Cancellation/CancellationDialog";
 import RefundStatusTracker from "@/components/Cancellation/RefundStatusTracker";
 const index = () => {
@@ -36,25 +36,27 @@ const index = () => {
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<any>(null);
   const [cancellations, setCancellations] = useState<any[]>([]);
+  const [bookings, setBookings] = useState<any[]>([]);
 
   useEffect(() => {
     console.log("[Profile] useEffect triggered. user object:", user);
     console.log("[Profile] user.id:", user?.id, "user._id:", user?._id);
-    
+
     if (!user) {
       console.warn("[Profile] user is null/undefined");
       setCancellations([]);
       return;
     }
-    
+
     const userId = user.id || user._id;
-    
+
     if (!userId) {
       console.error("[Profile] ERROR: Neither user.id nor user._id exists!", "Full user object:", JSON.stringify(user));
       setCancellations([]);
+      setBookings([]);
       return;
     }
-    
+
     console.log("[Profile] Fetching cancellations for userId:", userId, "type:", typeof userId);
     getUserCancellations(userId)
       .then((data) => {
@@ -67,9 +69,17 @@ const index = () => {
           status: error?.response?.status,
           data: error?.response?.data,
           url: error?.response?.config?.url,
-          fullError: error
         });
         setCancellations([]);
+      });
+
+    getUserBookings(userId)
+      .then((data) => {
+        console.log("[Profile] SUCCESS: Got bookings:", data);
+        setBookings(Array.isArray(data) ? data : []);
+      })
+      .catch((error) => {
+        console.error("[Profile] ERROR fetching bookings:", error);
       });
   }, [user]);
 
@@ -79,21 +89,13 @@ const index = () => {
   };
 
   const handleCancellationComplete = (result: any) => {
-    // Refresh cancellations list
-    const userId = user?.id || user?._id;
-    if (userId) {
-      console.log("[Profile] handleCancellationComplete - refreshing with userId:", userId);
-      getUserCancellations(userId)
-        .then((data) => {
-          console.log("[Profile] Refreshed cancellations:", data);
-          setCancellations(Array.isArray(data) ? data : []);
-        })
-        .catch((error) => {
-          console.error("[Profile] Failed to refresh cancellations:", error);
-        });
-    } else {
-      console.error("[Profile] handleCancellationComplete - no userId available");
-    }
+    // Close the dialog
+    setCancelDialogOpen(false);
+    setSelectedBooking(null);
+
+    // Redirect to cancellations page to see the cancelled booking
+    console.log("[Profile] handleCancellationComplete - redirecting to cancellations page");
+    router.push("/cancellations");
   };
 
   const isBookingCancelled = (bookingId: string) => {
@@ -159,6 +161,7 @@ const index = () => {
   };
 
   const formatDate = (dateString: string) => {
+    if (!dateString) return "N/A";
     // Parse YYYY-MM-DD as local time to avoid UTC timezone offset
     const parts = dateString.split("-");
     if (parts.length === 3) {
@@ -171,11 +174,11 @@ const index = () => {
     }
     return dateString;
   };
-  const handleEditFormChange = (field:any, value:any) => {
+  const handleEditFormChange = (field: any, value: any) => {
     setUserData((prevState) => ({
-        ...prevState,
-        [field]: value, // Update the specific field dynamically
-      }));
+      ...prevState,
+      [field]: value, // Update the specific field dynamically
+    }));
   };
   return (
     <div className="min-h-screen bg-gray-50 pt-8 px-4">
@@ -239,7 +242,7 @@ const index = () => {
                       type="email"
                       value={userData.email}
                       onChange={(e) => handleEditFormChange("email", e.target.value)}
-                      
+
                       className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
                     />
                   </div>
@@ -310,7 +313,7 @@ const index = () => {
             <div className="bg-white rounded-xl shadow-lg p-6">
               <h2 className="text-2xl font-bold mb-6">My Bookings</h2>
               <div className="space-y-6">
-                {user?.bookings.map((booking: any, index: any) => (
+                {(bookings.length > 0 ? bookings : user?.bookings || []).map((booking: any, index: any) => (
                   <div
                     key={index}
                     className="border rounded-lg p-4 hover:shadow-md transition-shadow"
@@ -329,7 +332,7 @@ const index = () => {
                         <div>
                           <h3 className="font-semibold">{booking?.type}</h3>
                           <p className="text-sm text-gray-500">
-                            Booking ID: {booking?.bookingId}
+                            Booking ID: {booking?.id || booking?.bookingId}
                           </p>
                         </div>
                       </div>
@@ -356,15 +359,15 @@ const index = () => {
                     </div>
 
                     {/* Cancel & Refund section */}
-                    {isBookingCancelled(booking?.bookingId) ? (
+                    {isBookingCancelled(booking?.id || booking?.bookingId) ? (
                       <div className="mt-4 pt-3 border-t border-gray-100">
                         <div className="flex items-center gap-2 mb-2">
                           <XCircle className="w-4 h-4 text-red-500" />
                           <span className="text-sm font-medium text-red-600">Booking Cancelled</span>
                         </div>
-                        {getBookingCancellation(booking?.bookingId)?.refundTracker && (
+                        {getBookingCancellation(booking?.id || booking?.bookingId)?.refundTracker && (
                           <RefundStatusTracker
-                            tracker={getBookingCancellation(booking?.bookingId).refundTracker}
+                            tracker={getBookingCancellation(booking?.id || booking?.bookingId).refundTracker!}
                             compact
                           />
                         )}

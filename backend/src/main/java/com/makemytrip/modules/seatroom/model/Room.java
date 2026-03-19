@@ -1,28 +1,44 @@
 package com.makemytrip.modules.seatroom.model;
 
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.Version;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.mapping.Document;
 
+import java.time.LocalDateTime;
+import java.util.List;
+
+@Data
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
 @Document(collection = "rooms")
+@CompoundIndex(name = "hotel_room_idx", def = "{'hotelId': 1, 'roomNumber': 1}", unique = true)
 public class Room {
     @Id
     private String id;
+
     private String hotelId;
     private String roomNumber;
-    private String roomType;
+    private RoomType roomType;       // STANDARD, DELUXE, SUITE, PENTHOUSE
     private boolean available;
     private double pricePerNight;
+    private int maxOccupancy;
+    private List<String> amenities;  // e.g. ["WiFi", "Mini Bar", "Balcony"]
+    private List<String> images;     // URLs for room preview carousel
 
-    public String getId() { return id; }
-    public void setId(String id) { this.id = id; }
-    public String getHotelId() { return hotelId; }
-    public void setHotelId(String hotelId) { this.hotelId = hotelId; }
-    public String getRoomNumber() { return roomNumber; }
-    public void setRoomNumber(String roomNumber) { this.roomNumber = roomNumber; }
-    public String getRoomType() { return roomType; }
-    public void setRoomType(String roomType) { this.roomType = roomType; }
-    public boolean isAvailable() { return available; }
-    public void setAvailable(boolean available) { this.available = available; }
-    public double getPricePerNight() { return pricePerNight; }
-    public void setPricePerNight(double pricePerNight) { this.pricePerNight = pricePerNight; }
+    // Lock fields for optimistic concurrency
+    private String lockedByUserId;
+    private LocalDateTime lockedUntil;
+
+    @Version
+    private Long version;
+
+    public boolean isLocked() {
+        return lockedByUserId != null && lockedUntil != null && lockedUntil.isAfter(LocalDateTime.now());
+    }
 }

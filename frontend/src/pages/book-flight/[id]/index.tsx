@@ -41,6 +41,10 @@ import { Users, Ticket } from "lucide-react";
 import SignupDialog from "@/components/SignupDialog";
 import Loader from "@/components/Loader";
 import { setUser } from "@/store";
+import SeatMap from "@/components/Flights/SeatMap";
+import PriceFreezeButton from "@/components/pricing/PriceFreezeButton";
+import PriceHistoryChart from "@/components/pricing/PriceHistoryChart";
+
 const BookFlightPage = () => {
   const router = useRouter();
   const { id } = router.query;
@@ -54,24 +58,45 @@ const BookFlightPage = () => {
     const fetchFlights = async () => {
       try {
         const data = await getflight();
-        const filteredData = data.filter((flight: any) => flight.id === id);
-        setFlights(filteredData);
-        console.log(filteredData);
+        if (data && Array.isArray(data)) {
+          const filteredData = data.filter((flight: any) => flight.id === id);
+          setFlights(filteredData);
+          console.log(filteredData);
+        }
       } catch (error) {
         console.error("Error fetching flights:", error);
       } finally {
         setLoading(false);
       }
     };
-    fetchFlights();
-  }, [id, user]);
+
+    if (id) {
+      fetchFlights();
+    }
+  }, [id]);
 
   if (loading) {
     return <Loader />;
   }
-  if (flights.length === 0) {
-    return <div>No flight data available for this ID.</div>;
+
+  if (!flights || flights.length === 0) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <AlertCircle className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Flight Not Found</h1>
+          <p className="text-gray-600 mb-4">The flight you're looking for doesn't exist.</p>
+          <button
+            onClick={() => router.push("/flights")}
+            className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600"
+          >
+            Back to Flights
+          </button>
+        </div>
+      </div>
+    );
   }
+
   const flight = flights[0];
   const flightDetails = {
     from: "Bengaluru",
@@ -139,6 +164,7 @@ const BookFlightPage = () => {
     },
   ];
   const formatDate = (dateString: string): string => {
+    if (!dateString) return "N/A";
     const options: Intl.DateTimeFormatOptions = {
       year: "numeric",
       month: "long",
@@ -160,20 +186,20 @@ const BookFlightPage = () => {
     );
   };
 
-  const totalPrice = flight?.price * quantity;
-  const totalTaxes = fareSummary?.taxes * quantity;
-  const totalOtherServices = fareSummary?.otherServices * quantity;
-  const totalDiscounts = fareSummary?.discounts * quantity;
+  const totalPrice = (flight?.price || 0) * quantity;
+  const totalTaxes = (fareSummary?.taxes || 0) * quantity;
+  const totalOtherServices = (fareSummary?.otherServices || 0) * quantity;
+  const totalDiscounts = (fareSummary?.discounts || 0) * quantity;
   const grandTotal =
     totalPrice + totalTaxes + totalOtherServices - totalDiscounts;
 
   const handlebooking = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      // Pass the flight departure date (YYYY-MM-DD) to store as the travel date
-      const travelDate = flight?.departureTime
-        ? flight.departureTime.substring(0, 10)
-        : undefined;
+      // Pass a date 7 days in the future to allow cancellation testing
+      const futureDate = new Date();
+      futureDate.setDate(futureDate.getDate() + 7);
+      const travelDate = futureDate.toISOString().substring(0, 10);
       const data = await handleflightbooking(
         user?.id,
         flight?.id,
@@ -259,6 +285,10 @@ const BookFlightPage = () => {
               value={quantity}
               onChange={handleQuantityChange}
             />
+          </div>
+          <div className="md:col-span-2 mt-4 bg-gray-50 p-4 rounded-xl border">
+            <h3 className="font-semibold text-gray-800 mb-2">Select Your Seats</h3>
+            <SeatMap flightId={flight?.id as string} userId={user?.id as string} />
           </div>
         </div>
         <div className="bg-gray-100 rounded-lg p-4">
@@ -429,6 +459,27 @@ const BookFlightPage = () => {
                   <span>Now</span>
                   <span>16 Jan, 15:55</span>
                   <span>16 Jan, 17:55</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Price History & Freeze */}
+            <div className="bg-white rounded-xl shadow-sm p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-lg font-bold flex items-center">
+                  <CreditCard className="w-5 h-5 mr-2 text-blue-500" />
+                  Dynamic Pricing & Price Freeze
+                </h2>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <h3 className="font-semibold mb-2 text-sm text-gray-700">Price Trend</h3>
+                  <PriceHistoryChart entityId={flight?.id as string} entityType="FLIGHT" />
+                </div>
+                <div className="flex flex-col justify-center items-center bg-gray-50 rounded-xl p-4 border border-dashed border-gray-300">
+                  <Plane className="w-8 h-8 text-blue-300 mb-2" />
+                  <p className="text-sm text-gray-600 mb-4 text-center">Lock in the current price and avoid future demand hikes! Your fare will be guaranteed.</p>
+                  <PriceFreezeButton entityId={flight?.id as string} entityType="FLIGHT" userId={user?.id} currentPrice={grandTotal} />
                 </div>
               </div>
             </div>

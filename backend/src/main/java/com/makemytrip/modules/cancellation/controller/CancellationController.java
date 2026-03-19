@@ -22,7 +22,6 @@ import java.util.Optional;
  */
 @RestController
 @RequestMapping("/api/cancellation")
-@CrossOrigin(origins = "*")
 public class CancellationController {
 
     private static final Logger log = LoggerFactory.getLogger(CancellationController.class);

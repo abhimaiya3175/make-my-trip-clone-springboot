@@ -1,29 +1,49 @@
 package com.makemytrip.modules.flightstatus.model;
 
-public class FlightStatus {
-    private String flightId;
-    private String flightName;
-    private String status;
-    private String departureTime;
-    private String arrivalTime;
-    private String gate;
-    private String terminal;
-    private int delayMinutes;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.Indexed;
+import org.springframework.data.mongodb.core.mapping.Document;
 
-    public String getFlightId() { return flightId; }
-    public void setFlightId(String flightId) { this.flightId = flightId; }
-    public String getFlightName() { return flightName; }
-    public void setFlightName(String flightName) { this.flightName = flightName; }
-    public String getStatus() { return status; }
-    public void setStatus(String status) { this.status = status; }
-    public String getDepartureTime() { return departureTime; }
-    public void setDepartureTime(String departureTime) { this.departureTime = departureTime; }
-    public String getArrivalTime() { return arrivalTime; }
-    public void setArrivalTime(String arrivalTime) { this.arrivalTime = arrivalTime; }
-    public String getGate() { return gate; }
-    public void setGate(String gate) { this.gate = gate; }
-    public String getTerminal() { return terminal; }
-    public void setTerminal(String terminal) { this.terminal = terminal; }
-    public int getDelayMinutes() { return delayMinutes; }
-    public void setDelayMinutes(int delayMinutes) { this.delayMinutes = delayMinutes; }
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+@Document(collection = "flight_status")
+public class FlightStatus {
+    @Id
+    private String id;
+    @Indexed(unique = true)
+    private String flightId;
+    private String airline;
+    private String origin;
+    private String destination;
+    private LocalDateTime scheduledDeparture;
+    private LocalDateTime estimatedDeparture;
+    private FlightStatusEnum status;
+    private Integer delayMinutes;
+    private String delayReason;
+    private LocalDateTime lastUpdated;
+    
+    @Builder.Default
+    private List<TimelineEvent> timeline = new ArrayList<>();
+    
+    public void addTimelineEvent(String event, String detail) {
+        if (timeline == null) {
+            timeline = new ArrayList<>();
+        }
+        timeline.add(TimelineEvent.builder()
+            .timestamp(LocalDateTime.now())
+            .event(event)
+            .detail(detail)
+            .build());
+        this.lastUpdated = LocalDateTime.now();
+    }
 }

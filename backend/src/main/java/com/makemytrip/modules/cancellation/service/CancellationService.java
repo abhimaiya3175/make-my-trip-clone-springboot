@@ -10,7 +10,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
-import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -23,6 +22,7 @@ import java.util.stream.Collectors;
  * - Refund tracking
  */
 @Service
+@SuppressWarnings("null")
 public class CancellationService {
 
     private static final Logger log = LoggerFactory.getLogger(CancellationService.class);
@@ -37,27 +37,27 @@ public class CancellationService {
      * Generate cancellation preview before user confirms
      * Shows refund amount, percentage, and policy
      * 
-     * @param bookingId Booking ID to cancel
-     * @param bookingType Type of booking (FLIGHT/HOTEL)
+     * @param bookingId        Booking ID to cancel
+     * @param bookingType      Type of booking (FLIGHT/HOTEL)
      * @param quantityToCancel Quantity to cancel (for partial cancellation)
-     * @param totalQuantity Total quantity in booking
-     * @param originalPrice Original booking price
-     * @param travelDateTime Travel date and time
+     * @param totalQuantity    Total quantity in booking
+     * @param originalPrice    Original booking price
+     * @param travelDateTime   Travel date and time
      * @return CancellationPreviewDTO with all details
      */
     public CancellationPreviewDTO generateCancellationPreview(String bookingId,
-                                                             String bookingType,
-                                                             int quantityToCancel,
-                                                             int totalQuantity,
-                                                             double originalPrice,
-                                                             LocalDateTime travelDateTime) {
-        
+            String bookingType,
+            int quantityToCancel,
+            int totalQuantity,
+            double originalPrice,
+            LocalDateTime travelDateTime) {
+
         LocalDateTime now = LocalDateTime.now();
         log.info("=== CANCELLATION PREVIEW ===");
-        log.info("BookingId: {}, Type: {}, Cancel: {}/{}, Price: {}", 
-            bookingId, bookingType, quantityToCancel, totalQuantity, originalPrice);
+        log.info("BookingId: {}, Type: {}, Cancel: {}/{}, Price: {}",
+                bookingId, bookingType, quantityToCancel, totalQuantity, originalPrice);
         log.info("Travel DateTime: {}, Current DateTime: {}", travelDateTime, now);
-        
+
         long hoursUntilTravel = RefundCalculationService.getHoursUntilTravel(now, travelDateTime);
         log.info("Hours until travel: {}", hoursUntilTravel);
 
@@ -80,8 +80,7 @@ public class CancellationService {
 
         // Calculate refund amount using consistent 'now'
         double refundAmount = RefundCalculationService.calculatePartialRefundAmount(
-            originalPrice, totalQuantity, quantityToCancel, now, travelDateTime
-        );
+                originalPrice, totalQuantity, quantityToCancel, now, travelDateTime);
         preview.setRefundAmount(refundAmount);
 
         // Calculate refund percentage
@@ -95,8 +94,8 @@ public class CancellationService {
 
         preview.setHoursUntilTravel(hoursUntilTravel + " hours");
 
-        log.info("Preview result: refundAmount={}, refundPercentage={}%, eligibleFor90={}", 
-            refundAmount, refundPercentage, eligibleFor90);
+        log.info("Preview result: refundAmount={}, refundPercentage={}%, eligibleFor90={}",
+                refundAmount, refundPercentage, eligibleFor90);
         log.info("=== END PREVIEW ===");
 
         return preview;
@@ -106,28 +105,29 @@ public class CancellationService {
      * Cancel a booking (full or partial cancellation)
      * Creates Cancellation and RefundTracker records
      * 
-     * @param userId User ID requesting cancellation
-     * @param request CancellationRequestDTO with cancellation details
-     * @param totalQuantity Total quantity in original booking
-     * @param originalPrice Original booking price
+     * @param userId         User ID requesting cancellation
+     * @param request        CancellationRequestDTO with cancellation details
+     * @param totalQuantity  Total quantity in original booking
+     * @param originalPrice  Original booking price
      * @param travelDateTime Travel date/time
      * @return CancellationResponseDTO with confirmation details
      */
     public CancellationResponseDTO cancelBooking(String userId,
-                                                CancellationRequestDTO request,
-                                                int totalQuantity,
-                                                double originalPrice,
-                                                LocalDateTime travelDateTime) {
-        
+            CancellationRequestDTO request,
+            int totalQuantity,
+            double originalPrice,
+            LocalDateTime travelDateTime) {
+
         CancellationResponseDTO response = new CancellationResponseDTO();
-        
+
         try {
             // Capture current time ONCE for consistency
             LocalDateTime now = LocalDateTime.now();
-            
+
             log.info("=== CANCEL BOOKING ===");
             log.info("UserId: {}, BookingId: {}, Type: {}", userId, request.getBookingId(), request.getBookingType());
-            log.info("Reason: {}, QuantityToCancel: {}, TotalQuantity: {}", request.getReason(), request.getQuantityToCancel(), totalQuantity);
+            log.info("Reason: {}, QuantityToCancel: {}, TotalQuantity: {}", request.getReason(),
+                    request.getQuantityToCancel(), totalQuantity);
             log.info("OriginalPrice: {}, TravelDateTime: {}, CurrentTime: {}", originalPrice, travelDateTime, now);
 
             // Create Cancellation record
@@ -162,15 +162,13 @@ public class CancellationService {
 
             // Calculate refund amount using consistent 'now'
             double refundAmount = RefundCalculationService.calculatePartialRefundAmount(
-                originalPrice, totalQuantity, quantityToCancel, now, travelDateTime
-            );
+                    originalPrice, totalQuantity, quantityToCancel, now, travelDateTime);
             cancellation.setRefundAmount(refundAmount);
             log.info("Calculated refund amount: {}", refundAmount);
 
             // Calculate refund percentage using consistent 'now'
             double refundPercentage = RefundCalculationService.calculateRefundPercentage(
-                now, travelDateTime
-            );
+                    now, travelDateTime);
             cancellation.setRefundPercentage(refundPercentage * 100);
             log.info("Refund percentage: {}% (raw: {})", refundPercentage * 100, refundPercentage);
 
@@ -181,7 +179,8 @@ public class CancellationService {
             Cancellation savedCancellation = cancellationRepository.save(cancellation);
             log.info("Saved cancellation with ID: {}", savedCancellation.getId());
 
-            // Create RefundTracker with REFUND_INITIATED status (auto-advance from CANCELLATION_REQUESTED)
+            // Create RefundTracker with REFUND_INITIATED status (auto-advance from
+            // CANCELLATION_REQUESTED)
             RefundTracker refundTracker = new RefundTracker(savedCancellation.getId(), refundAmount);
             refundTracker.setStatus(RefundStatus.REFUND_INITIATED);
             refundTracker.setNotes("Refund initiated automatically upon cancellation confirmation");
@@ -249,7 +248,7 @@ public class CancellationService {
      */
     public Optional<RefundTrackerDTO> getRefundStatus(String cancellationId) {
         Optional<RefundTracker> tracker = refundTrackerRepository.findByCancellationId(cancellationId);
-        
+
         if (tracker.isPresent()) {
             RefundTracker rt = tracker.get();
             RefundTrackerDTO dto = new RefundTrackerDTO();
@@ -287,7 +286,7 @@ public class CancellationService {
         log.info("Fetching cancellations for userId: {}", userId);
         List<Cancellation> cancellations = cancellationRepository.findByUserId(userId);
         log.info("Found {} cancellation(s) for user {}", cancellations.size(), userId);
-        
+
         return cancellations.stream().map(cancellation -> {
             CancellationResponseDTO response = new CancellationResponseDTO();
             response.setCancellationId(cancellation.getId());
@@ -322,16 +321,16 @@ public class CancellationService {
      * Update refund status (for admin operations)
      * 
      * @param refundTrackerId Refund tracker ID
-     * @param newStatus New refund status
-     * @param notes Optional notes
+     * @param newStatus       New refund status
+     * @param notes           Optional notes
      * @return Updated RefundTrackerDTO
      */
-    public Optional<RefundTrackerDTO> updateRefundStatus(String refundTrackerId, 
-                                                        RefundStatus newStatus, 
-                                                        String notes) {
+    public Optional<RefundTrackerDTO> updateRefundStatus(String refundTrackerId,
+            RefundStatus newStatus,
+            String notes) {
         log.info("Updating refund status: trackerId={}, newStatus={}, notes={}", refundTrackerId, newStatus, notes);
         Optional<RefundTracker> tracker = refundTrackerRepository.findById(refundTrackerId);
-        
+
         if (tracker.isPresent()) {
             RefundTracker rt = tracker.get();
             rt.setStatus(newStatus);
@@ -339,9 +338,9 @@ public class CancellationService {
                 rt.setNotes(notes);
             }
             rt.setUpdatedAt(LocalDateTime.now());
-            
+
             RefundTracker updated = refundTrackerRepository.save(rt);
-            
+
             RefundTrackerDTO dto = new RefundTrackerDTO();
             dto.setId(updated.getId());
             dto.setCancellationId(updated.getCancellationId());
@@ -350,10 +349,10 @@ public class CancellationService {
             dto.setRefundAmount(updated.getRefundAmount());
             dto.setUpdatedAt(updated.getUpdatedAt());
             dto.setNotes(updated.getNotes());
-            
+
             return Optional.of(dto);
         }
-        
+
         return Optional.empty();
     }
 
@@ -372,11 +371,12 @@ public class CancellationService {
      */
     private String buildSuccessMessage(int cancelledQuantity, int totalQuantity, double refundAmount) {
         if (cancelledQuantity >= totalQuantity) {
-            return String.format("Booking cancelled successfully. Refund of ₹%.2f will be processed shortly.", 
-                               refundAmount);
+            return String.format("Booking cancelled successfully. Refund of ₹%.2f will be processed shortly.",
+                    refundAmount);
         } else {
-            return String.format("Partial cancellation successful. %d unit(s) cancelled. Refund of ₹%.2f will be processed shortly.", 
-                               cancelledQuantity, refundAmount);
+            return String.format(
+                    "Partial cancellation successful. %d unit(s) cancelled. Refund of ₹%.2f will be processed shortly.",
+                    cancelledQuantity, refundAmount);
         }
     }
 }

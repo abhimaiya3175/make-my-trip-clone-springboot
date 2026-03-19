@@ -1,0 +1,79 @@
+[
+  {
+    "flightId": "AI101",
+    "airline": "Air India",
+    "origin": "DEL",
+    "destination": "BOM",
+    "scheduledDeparture": "2026-03-06T10:00:00",
+    "estimatedDeparture": "2026-03-06T10:00:00",
+    "status": "ON_TIME",
+    "delayMinutes": 0,
+    "delayReason": null,
+    "timeline": [
+      {"timestamp": "2026-03-06T08:00:00", "event": "CHECK_IN_OPEN", "detail": "Check-in counters opened"},
+      {"timestamp": "2026-03-06T09:30:00", "event": "BOARDING_SOON", "detail": "Boarding will begin shortly"}
+    ]
+  },
+  {
+    "flightId": "6E234",
+    "airline": "IndiGo",
+    "origin": "BLR",
+    "destination": "HYD",
+    "scheduledDeparture": "2026-03-06T14:30:00",
+    "estimatedDeparture": "2026-03-06T15:15:00",
+    "status": "DELAYED",
+    "delayMinutes": 45,
+    "delayReason": "Air traffic congestion",
+    "timeline": [
+      {"timestamp": "2026-03-06T12:30:00", "event": "CHECK_IN_OPEN", "detail": "Check-in counters opened"},
+      {"timestamp": "2026-03-06T14:00:00", "event": "DELAY_ANNOUNCED", "detail": "Delay: air traffic congestion"}
+    ]
+  },
+  {
+    "flightId": "SG567",
+    "airline": "SpiceJet",
+    "origin": "MAA",
+    "destination": "GOI",
+    "scheduledDeparture": "2026-03-06T16:00:00",
+    "estimatedDeparture": "2026-03-06T16:00:00",
+    "status": "BOARDING",
+    "delayMinutes": 0,
+    "delayReason": null,
+    "timeline": [
+      {"timestamp": "2026-03-06T14:00:00", "event": "CHECK_IN_OPEN", "detail": "Check-in counters opened"},
+      {"timestamp": "2026-03-06T15:30:00", "event": "BOARDING_STARTED", "detail": "Boarding at Gate 12"}
+    ]
+  },
+  {
+    "flightId": "UK892",
+    "airline": "Vistara",
+    "origin": "CCU",
+    "destination": "DEL",
+    "scheduledDeparture": "2026-03-06T11:00:00",
+    "estimatedDeparture": "2026-03-06T11:00:00",
+    "status": "LANDED",
+    "delayMinutes": 0,
+    "delayReason": null,
+    "timeline": [
+      {"timestamp": "2026-03-06T09:00:00", "event": "CHECK_IN_OPEN", "detail": "Check-in counters opened"},
+      {"timestamp": "2026-03-06T10:30:00", "event": "BOARDING_STARTED", "detail": "Boarding in progress"},
+      {"timestamp": "2026-03-06T11:05:00", "event": "DEPARTED", "detail": "Flight departed"},
+      {"timestamp": "2026-03-06T13:20:00", "event": "LANDED", "detail": "Landed at Delhi"}
+    ]
+  },
+  {
+    "flightId": "AI456",
+    "airline": "Air India",
+    "origin": "PNQ",
+    "destination": "AMD",
+    "scheduledDeparture": "2026-03-06T12:00:00",
+    "estimatedDeparture": "2026-03-06T12:00:00",
+    "status": "CANCELLED",
+    "delayMinutes": 0,
+    "delayReason": "Technical issues",
+    "timeline": [
+      {"timestamp": "2026-03-06T10:00:00", "event": "CHECK_IN_OPEN", "detail": "Check-in counters opened"},
+      {"timestamp": "2026-03-06T11:30:00", "event": "CANCELLED", "detail": "Cancelled - technical issues"}
+    ]
+  }
+]

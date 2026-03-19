@@ -76,7 +76,7 @@ const CancellationDialog: React.FC<CancellationDialogProps> = ({
 
   const getTravelDateTime = () => {
     console.log("[CancellationDialog] getTravelDateTime - booking.date:", booking?.date);
-    
+
     if (!booking?.date) {
       // No date available - default to 48 hours from now
       const future = new Date(Date.now() + 48 * 60 * 60 * 1000);
@@ -84,7 +84,7 @@ const CancellationDialog: React.FC<CancellationDialogProps> = ({
       console.warn("[CancellationDialog] No booking date, using fallback:", result);
       return result;
     }
-    
+
     // Parse YYYY-MM-DD as local date to avoid timezone shift
     const parts = booking.date.split("-");
     if (parts.length === 3) {
@@ -92,7 +92,7 @@ const CancellationDialog: React.FC<CancellationDialogProps> = ({
       const month = parseInt(parts[1]) - 1;
       const day = parseInt(parts[2]);
       console.log("[CancellationDialog] Parsed date parts:", { year, month, day });
-      
+
       const d = new Date(year, month, day, 23, 59, 0);
       if (!isNaN(d.getTime())) {
         const result = formatLocalDateTime(d);
@@ -100,7 +100,7 @@ const CancellationDialog: React.FC<CancellationDialogProps> = ({
         return result;
       }
     }
-    
+
     // Fallback for non-standard date strings
     const d = new Date(booking.date + "T23:59:00");
     if (!isNaN(d.getTime())) {
@@ -108,7 +108,7 @@ const CancellationDialog: React.FC<CancellationDialogProps> = ({
       console.log("[CancellationDialog] Fallback datetime format worked:", result);
       return result;
     }
-    
+
     // Last fallback
     const future = new Date(Date.now() + 48 * 60 * 60 * 1000);
     const result = formatLocalDateTime(future);
@@ -128,13 +128,13 @@ const CancellationDialog: React.FC<CancellationDialogProps> = ({
       setError("User ID is missing. Please refresh the page and try again.");
       return;
     }
-    
+
     setLoading(true);
     setError("");
     try {
       const travelDate = getTravelDateTime();
       console.log("[CancellationDialog] Fetching preview:", {
-        bookingId: booking.bookingId,
+        bookingId: booking.id || booking.bookingId,
         bookingType: booking.type?.toUpperCase() === "HOTEL" ? "HOTEL" : "FLIGHT",
         quantityToCancel,
         totalQuantity: booking.quantity,
@@ -144,7 +144,7 @@ const CancellationDialog: React.FC<CancellationDialogProps> = ({
       });
 
       const data = await getCancellationPreview(
-        booking.bookingId,
+        booking.id || booking.bookingId,
         booking.type?.toUpperCase() === "HOTEL" ? "HOTEL" : "FLIGHT",
         quantityToCancel,
         booking.quantity,
@@ -167,13 +167,13 @@ const CancellationDialog: React.FC<CancellationDialogProps> = ({
       setError("User ID is missing. Please refresh the page and try again.");
       return;
     }
-    
+
     setLoading(true);
     setError("");
     try {
       const travelDate = getTravelDateTime();
       const cancellationRequest = {
-        bookingId: booking.bookingId,
+        bookingId: booking.id || booking.bookingId,
         bookingType: booking.type?.toUpperCase() === "HOTEL" ? "HOTEL" : "FLIGHT",
         reason: selectedReason,
         quantityToCancel,
@@ -351,22 +351,19 @@ const CancellationDialog: React.FC<CancellationDialogProps> = ({
           <div className="space-y-5">
             {/* Refund policy banner */}
             <div
-              className={`rounded-lg p-4 flex items-start gap-3 ${
-                preview.eligibleFor90Percent
+              className={`rounded-lg p-4 flex items-start gap-3 ${preview.eligibleFor90Percent
                   ? "bg-green-50 border border-green-200"
                   : "bg-yellow-50 border border-yellow-200"
-              }`}
+                }`}
             >
               <Clock
-                className={`w-5 h-5 mt-0.5 flex-shrink-0 ${
-                  preview.eligibleFor90Percent ? "text-green-600" : "text-yellow-600"
-                }`}
+                className={`w-5 h-5 mt-0.5 flex-shrink-0 ${preview.eligibleFor90Percent ? "text-green-600" : "text-yellow-600"
+                  }`}
               />
               <div>
                 <p
-                  className={`font-medium text-sm ${
-                    preview.eligibleFor90Percent ? "text-green-800" : "text-yellow-800"
-                  }`}
+                  className={`font-medium text-sm ${preview.eligibleFor90Percent ? "text-green-800" : "text-yellow-800"
+                    }`}
                 >
                   {preview.refundPolicy}
                 </p>
@@ -489,11 +486,10 @@ const CancellationDialog: React.FC<CancellationDialogProps> = ({
                       return (
                         <div key={stage} className="flex flex-col items-center flex-1">
                           <div
-                            className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                              isCompleted
+                            className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${isCompleted
                                 ? "bg-blue-600 text-white"
                                 : "bg-gray-200 text-gray-400"
-                            }`}
+                              }`}
                           >
                             {isCompleted ? "✓" : index + 1}
                           </div>

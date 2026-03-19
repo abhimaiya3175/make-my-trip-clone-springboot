@@ -1,0 +1,15 @@
+[
+  {"hotelId":"HTL001","roomNumber":"101","roomType":"STANDARD","available":true,"pricePerNight":3500,"maxOccupancy":2,"amenities":["WiFi","AC","TV"],"images":[]},
+  {"hotelId":"HTL001","roomNumber":"102","roomType":"STANDARD","available":true,"pricePerNight":3500,"maxOccupancy":2,"amenities":["WiFi","AC","TV"],"images":[]},
+  {"hotelId":"HTL001","roomNumber":"103","roomType":"STANDARD","available":false,"pricePerNight":3500,"maxOccupancy":2,"amenities":["WiFi","AC","TV"],"images":[]},
+  {"hotelId":"HTL001","roomNumber":"201","roomType":"DELUXE","available":true,"pricePerNight":6000,"maxOccupancy":3,"amenities":["WiFi","AC","TV","Mini Bar","Balcony"],"images":[]},
+  {"hotelId":"HTL001","roomNumber":"202","roomType":"DELUXE","available":true,"pricePerNight":6000,"maxOccupancy":3,"amenities":["WiFi","AC","TV","Mini Bar","Balcony"],"images":[]},
+  {"hotelId":"HTL001","roomNumber":"203","roomType":"DELUXE","available":false,"pricePerNight":6000,"maxOccupancy":3,"amenities":["WiFi","AC","TV","Mini Bar","Balcony"],"images":[]},
+  {"hotelId":"HTL001","roomNumber":"301","roomType":"SUITE","available":true,"pricePerNight":12000,"maxOccupancy":4,"amenities":["WiFi","AC","TV","Mini Bar","Balcony","Jacuzzi","Living Room"],"images":[]},
+  {"hotelId":"HTL001","roomNumber":"302","roomType":"SUITE","available":true,"pricePerNight":12000,"maxOccupancy":4,"amenities":["WiFi","AC","TV","Mini Bar","Balcony","Jacuzzi","Living Room"],"images":[]},
+  {"hotelId":"HTL001","roomNumber":"PH01","roomType":"PENTHOUSE","available":true,"pricePerNight":25000,"maxOccupancy":6,"amenities":["WiFi","AC","TV","Mini Bar","Balcony","Jacuzzi","Living Room","Private Pool","Butler Service"],"images":[]},
+  {"hotelId":"HTL002","roomNumber":"101","roomType":"STANDARD","available":true,"pricePerNight":2800,"maxOccupancy":2,"amenities":["WiFi","AC"],"images":[]},
+  {"hotelId":"HTL002","roomNumber":"102","roomType":"STANDARD","available":true,"pricePerNight":2800,"maxOccupancy":2,"amenities":["WiFi","AC"],"images":[]},
+  {"hotelId":"HTL002","roomNumber":"201","roomType":"DELUXE","available":true,"pricePerNight":5000,"maxOccupancy":3,"amenities":["WiFi","AC","TV","Mini Bar"],"images":[]},
+  {"hotelId":"HTL002","roomNumber":"301","roomType":"SUITE","available":true,"pricePerNight":10000,"maxOccupancy":4,"amenities":["WiFi","AC","TV","Mini Bar","Balcony","Jacuzzi"],"images":[]}
+]

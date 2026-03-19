@@ -10,7 +10,6 @@ import com.makemytrip.modules.auth.repository.UserRepository;
 import java.util.List;
 
 @RestController
-@CrossOrigin(origins = "*")
 public class AuthController {
     @Autowired
     private AuthService authService;

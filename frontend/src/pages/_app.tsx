@@ -4,9 +4,10 @@ import Head from "next/head";
 import store, { setUser } from "@/store";
 import { Provider } from "react-redux";
 import Navbar from "@/components/Navbar";
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 import { useEffect } from "react";
-import Footer from "@/components/Fotter";
+import Footer from "@/components/Footer";
 import { useRouter } from "next/router";
 
 const Myapp = ({ Component, pageProps }: AppProps) => {
@@ -22,7 +23,9 @@ const Myapp = ({ Component, pageProps }: AppProps) => {
   return (
     <div className="min-h-screen ">
       {!isHomePage && <Navbar />}
-      <Component {...pageProps} />
+      <ErrorBoundary>
+        <Component {...pageProps} />
+      </ErrorBoundary>
       <Footer/>
     </div>
   );
