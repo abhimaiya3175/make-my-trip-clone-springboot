@@ -15,7 +15,8 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { getflight, handleflightbooking } from "@/api";
+import { handleflightbooking } from "@/api";
+import { getFlightById } from "@/services/flightService";
 import { useDispatch, useSelector } from "react-redux";
 interface Flight {
   id: string; // Unique identifier for the flight
@@ -55,24 +56,20 @@ const BookFlightPage = () => {
   const user = useSelector((state: any) => state.user.user);
   const dispatch = useDispatch();
   useEffect(() => {
-    const fetchFlights = async () => {
+    const fetchFlight = async () => {
+      if (!id) return;
       try {
-        const data = await getflight();
-        if (data && Array.isArray(data)) {
-          const filteredData = data.filter((flight: any) => flight.id === id);
-          setFlights(filteredData);
-          console.log(filteredData);
+        const data = await getFlightById(id as string);
+        if (data) {
+          setFlights([data]);
         }
       } catch (error) {
-        console.error("Error fetching flights:", error);
+        console.error("Error fetching flight:", error);
       } finally {
         setLoading(false);
       }
     };
-
-    if (id) {
-      fetchFlights();
-    }
+    fetchFlight();
   }, [id]);
 
   if (loading) {

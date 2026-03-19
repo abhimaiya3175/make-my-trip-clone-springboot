@@ -1,13 +1,18 @@
-import api from "@/utils/api";
+import api, { unwrapApiResponse } from "@/utils/api";
 
 export const getflight = async () => {
   try {
     const res = await api.get(`/flight`);
-    return res.data;
+    return unwrapApiResponse(res);
   } catch (error) {
     console.log(error);
     return [];
   }
+};
+
+export const getFlightById = async (id) => {
+  const res = await api.get(`/api/flight/${id}`);
+  return unwrapApiResponse(res);
 };
 
 export const addflight = async (flightName, from, to, departureTime, arrivalTime, price, availableSeats) => {

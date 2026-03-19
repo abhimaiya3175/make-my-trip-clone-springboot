@@ -33,6 +33,9 @@ const Navbar = () => {
   const router = useRouter();
   const logout = () => {
     dispatch(clearUser());
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("authToken");
+    }
     router.push("/");
   };
 

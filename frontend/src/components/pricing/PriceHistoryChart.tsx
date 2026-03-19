@@ -9,8 +9,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
+import api from "@/utils/api";
 
 interface SnapshotPoint {
   time: string;
@@ -39,15 +38,11 @@ const PriceHistoryChart: React.FC<PriceHistoryChartProps> = ({
       setLoading(true);
       setError(null);
       try {
-        const res = await fetch(
-          `${API_BASE}/api/pricing/${entityType}/${entityId}/history?days=${days}`
+        const res = await api.get(
+          `/api/pricing/${entityType}/${entityId}/history`,
+          { params: { days } }
         );
-        if (res.ok) {
-          const json = await res.json();
-          setHistory(json.data?.history || []);
-        } else {
-          setError("Failed to load price history.");
-        }
+        setHistory(res.data?.data?.history || []);
       } catch {
         setError("Could not connect to pricing service.");
       } finally {

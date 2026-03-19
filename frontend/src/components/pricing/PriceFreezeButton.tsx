@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "../ui/button";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
+import api from "@/utils/api";
 
 interface PriceFreezeButtonProps {
   entityId: string;
@@ -32,20 +31,11 @@ const PriceFreezeButton: React.FC<PriceFreezeButtonProps> = ({
   const checkExistingFreeze = useCallback(async () => {
     if (!userId) return;
     try {
-      const res = await fetch(`${API_BASE}/api/pricing/freeze/user/${userId}`);
-      if (res.ok) {
-        const json = await res.json();
-        const freezes: FreezeInfo[] = json.data || [];
-        const match = freezes.find(
-          (f) => f.active && f.frozenPrice > 0
-        );
-        // find the one matching this entity
-        const entityFreeze = freezes.find(
-          (f) => f.active
-        );
-        if (entityFreeze) {
-          setFreeze(entityFreeze);
-        }
+      const res = await api.get(`/api/pricing/freeze/user/${userId}`);
+      const freezes: FreezeInfo[] = Array.isArray(res.data?.data) ? res.data.data : [];
+      const entityFreeze = freezes.find((f) => f.active);
+      if (entityFreeze) {
+        setFreeze(entityFreeze);
       }
     } catch {
       // Ignore - no freeze found
@@ -90,17 +80,12 @@ const PriceFreezeButton: React.FC<PriceFreezeButtonProps> = ({
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${API_BASE}/api/pricing/freeze`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, entityId, entityType }),
+      const res = await api.post(`/api/pricing/freeze`, {
+        userId,
+        entityId,
+        entityType,
       });
-      const json = await res.json();
-      if (res.ok) {
-        setFreeze(json.data);
-      } else {
-        setError(json.error?.message || "Failed to freeze price");
-      }
+      setFreeze(res.data?.data || null);
     } catch {
       setError("Failed to freeze price");
     } finally {

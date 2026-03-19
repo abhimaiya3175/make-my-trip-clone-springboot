@@ -1,8 +1,7 @@
 import React, { useState } from "react";
 import { Card, CardContent } from "../ui/card";
 import { Button } from "../ui/button";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
+import api from "@/utils/api";
 
 interface Recommendation {
   id: string;
@@ -37,11 +36,11 @@ const RecommendationCard: React.FC<RecommendationCardProps> = ({
     }
     setLoadingExplain(true);
     try {
-      const res = await fetch(
-        `${API_BASE}/api/recommendations/${recommendation.itemId}/explain?userId=${userId}`
+      const res = await api.get(
+        `/api/recommendations/${recommendation.itemId}/explain`,
+        { params: { userId } }
       );
-      const json = await res.json();
-      setExplanation(json.data?.explanation || "No details available.");
+      setExplanation(res.data?.data?.explanation || "No details available.");
     } catch {
       setExplanation("Could not load explanation.");
     } finally {
@@ -51,15 +50,11 @@ const RecommendationCard: React.FC<RecommendationCardProps> = ({
 
   const sendFeedback = async (type: "LIKE" | "SAVE" | "NOT_INTERESTED") => {
     try {
-      await fetch(`${API_BASE}/api/recommendations/feedback`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      await api.post(`/api/recommendations/feedback`, {
           userId,
           itemId: recommendation.itemId,
           itemType: recommendation.itemType,
           feedbackType: type,
-        }),
       });
       setFeedbackSent(type);
       onFeedback?.();

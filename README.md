@@ -12,17 +12,24 @@ A full-stack travel booking application built with Spring Boot (Java 17) backend
 - **Security** — Spring Security filter chain, CORS policy, stateless sessions, BCrypt password encoding
 - **Testing** — 42 backend tests passing (Mockito + JUnit 5)
 
-## Feature Completion Snapshot (Updated: 15/03/2026)
+## Feature Completion Snapshot (Updated: March 2026)
 
-- Cancellation & Refunds: done (cancel from dashboard, auto-refund policy, partial cancellation/refund, reason dropdown, refund tracker)
-- Review & Rating System: mostly done
-   remaining: true file upload pipeline for photos is not implemented (current flow uses image URLs)
-- Live Flight Status (Mock API): mostly done
-   remaining: browser/system push notifications are not implemented; estimated arrival updates are not implemented (estimated departure is shown)
-- Seat/Room Selection: mostly done
-   remaining: 3D room preview is not implemented
+- Cancellation & Refunds: done
+- Review & Rating System: done (binary file upload via 
+   POST /api/reviews/upload-photo, max 5MB, jpeg/png/webp)
+- Live Flight Status: done (push notifications via Web Push API 
+   + VAPID, estimated arrival calculated from departure + duration)
+- Seat/Room Selection: done (image carousel + Pannellum 360 viewer 
+   for panorama rooms via isPanorama field)
 - Dynamic Pricing Engine: done
 - AI Recommendations: done
+
+## Task Audit
+
+- [x] True file upload for photos
+- [x] Push notifications
+- [x] Estimated arrival updates
+- [x] 3D room preview
 
 ## 📋 Table of Contents
 

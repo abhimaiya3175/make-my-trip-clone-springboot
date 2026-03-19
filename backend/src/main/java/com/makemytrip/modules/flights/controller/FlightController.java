@@ -1,12 +1,16 @@
 package com.makemytrip.modules.flights.controller;
 
+import com.makemytrip.common.api.ApiError;
+import com.makemytrip.common.api.ApiResponse;
 import com.makemytrip.modules.flights.model.Flight;
 import com.makemytrip.modules.flights.service.FlightService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.UUID;
 
 @RestController
 public class FlightController {
@@ -23,6 +27,17 @@ public class FlightController {
         List<Flight> flights = flightService.getAllFlights();
         return ResponseEntity.ok(flights);
     }
+
+        @GetMapping("/flight/{id}")
+        public ResponseEntity<?> getFlightById(@PathVariable String id) {
+        return flightService.getFlightById(id)
+            .map(f -> ResponseEntity.ok(
+                ApiResponse.ok(f, UUID.randomUUID().toString())))
+            .orElse(ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.fail(
+                    new ApiError("NOT_FOUND", "Flight not found", null),
+                    UUID.randomUUID().toString())));
+        }
 
     @PostMapping("/admin/flight")
     public ResponseEntity<Flight> addflight(@RequestBody Flight flight) {

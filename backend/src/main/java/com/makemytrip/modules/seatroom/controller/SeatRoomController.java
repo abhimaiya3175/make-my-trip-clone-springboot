@@ -5,10 +5,13 @@ import com.makemytrip.common.api.ApiResponse;
 import com.makemytrip.modules.seatroom.dto.*;
 import com.makemytrip.modules.seatroom.model.UserPreference;
 import com.makemytrip.modules.seatroom.service.SeatRoomService;
+import com.makemytrip.security.AuthContext;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -42,24 +45,30 @@ public class SeatRoomController {
     @PostMapping("/seats/{seatId}/lock")
     public ResponseEntity<ApiResponse<SeatResponse>> lockSeat(
             @PathVariable String seatId,
+            Authentication authentication,
             @Valid @RequestBody LockRequest request) {
-        var seat = seatRoomService.lockSeat(seatId, request.getUserId());
+        String userId = requireAuthenticatedUserId(authentication);
+        var seat = seatRoomService.lockSeat(seatId, userId);
         return ResponseEntity.ok(ApiResponse.ok(seat, reqId()));
     }
 
     @PostMapping("/seats/{seatId}/release")
     public ResponseEntity<ApiResponse<SeatResponse>> releaseSeat(
             @PathVariable String seatId,
+            Authentication authentication,
             @Valid @RequestBody LockRequest request) {
-        var seat = seatRoomService.releaseSeat(seatId, request.getUserId());
+        String userId = requireAuthenticatedUserId(authentication);
+        var seat = seatRoomService.releaseSeat(seatId, userId);
         return ResponseEntity.ok(ApiResponse.ok(seat, reqId()));
     }
 
     @PostMapping("/seats/{seatId}/confirm")
     public ResponseEntity<ApiResponse<SeatResponse>> confirmSeat(
             @PathVariable String seatId,
+            Authentication authentication,
             @Valid @RequestBody LockRequest request) {
-        var seat = seatRoomService.confirmSeatBooking(seatId, request.getUserId());
+        String userId = requireAuthenticatedUserId(authentication);
+        var seat = seatRoomService.confirmSeatBooking(seatId, userId);
         return ResponseEntity.ok(ApiResponse.ok(seat, reqId()));
     }
 
@@ -84,38 +93,53 @@ public class SeatRoomController {
     @PostMapping("/rooms/{roomId}/lock")
     public ResponseEntity<ApiResponse<RoomResponse>> lockRoom(
             @PathVariable String roomId,
+            Authentication authentication,
             @Valid @RequestBody LockRequest request) {
-        var room = seatRoomService.lockRoom(roomId, request.getUserId());
+        String userId = requireAuthenticatedUserId(authentication);
+        var room = seatRoomService.lockRoom(roomId, userId);
         return ResponseEntity.ok(ApiResponse.ok(room, reqId()));
     }
 
     @PostMapping("/rooms/{roomId}/release")
     public ResponseEntity<ApiResponse<RoomResponse>> releaseRoom(
             @PathVariable String roomId,
+            Authentication authentication,
             @Valid @RequestBody LockRequest request) {
-        var room = seatRoomService.releaseRoom(roomId, request.getUserId());
+        String userId = requireAuthenticatedUserId(authentication);
+        var room = seatRoomService.releaseRoom(roomId, userId);
         return ResponseEntity.ok(ApiResponse.ok(room, reqId()));
     }
 
     @PostMapping("/rooms/{roomId}/confirm")
     public ResponseEntity<ApiResponse<RoomResponse>> confirmRoom(
             @PathVariable String roomId,
+            Authentication authentication,
             @Valid @RequestBody LockRequest request) {
-        var room = seatRoomService.confirmRoomBooking(roomId, request.getUserId());
+        String userId = requireAuthenticatedUserId(authentication);
+        var room = seatRoomService.confirmRoomBooking(roomId, userId);
         return ResponseEntity.ok(ApiResponse.ok(room, reqId()));
     }
 
     // ── User preferences ─────────────────────────────────────────────
 
     @GetMapping("/preferences/{userId}")
-    public ResponseEntity<ApiResponse<UserPreference>> getPreferences(@PathVariable String userId) {
+    public ResponseEntity<ApiResponse<UserPreference>> getPreferences(
+            @PathVariable String userId,
+            Authentication authentication) {
+        String authenticatedUserId = requireAuthenticatedUserId(authentication);
+        if (!authenticatedUserId.equals(userId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Forbidden");
+        }
         var pref = seatRoomService.getPreferences(userId);
         return ResponseEntity.ok(ApiResponse.ok(pref, reqId()));
     }
 
     @PutMapping("/preferences")
     public ResponseEntity<ApiResponse<UserPreference>> savePreferences(
+            Authentication authentication,
             @Valid @RequestBody UserPreferenceRequest request) {
+        String userId = requireAuthenticatedUserId(authentication);
+        request.setUserId(userId);
         var pref = seatRoomService.savePreferences(request);
         return ResponseEntity.ok(ApiResponse.ok(pref, reqId()));
     }
@@ -136,5 +160,13 @@ public class SeatRoomController {
 
     private String reqId() {
         return UUID.randomUUID().toString().substring(0, 8);
+    }
+
+    private String requireAuthenticatedUserId(Authentication authentication) {
+        String userId = AuthContext.userId(authentication);
+        if (userId == null || userId.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authentication is required");
+        }
+        return userId;
     }
 }
