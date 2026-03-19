@@ -2,6 +2,11 @@ import React from "react";
 import { render, screen, waitFor, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
+jest.mock("lucide-react", () => ({
+  Bell: () => <span data-testid="bell-icon" />,
+  BellOff: () => <span data-testid="bell-off-icon" />,
+}));
+
 // Mock next/router
 jest.mock("next/router", () => ({
   useRouter: () => ({ query: {} }),
@@ -22,6 +27,8 @@ const mockStatusOnTime = {
   destination: "BOM",
   scheduledDeparture: "2026-03-06T10:00:00Z",
   estimatedDeparture: "2026-03-06T10:00:00Z",
+  scheduledArrival: "2026-03-06T12:00:00Z",
+  estimatedArrival: "2026-03-06T12:00:00Z",
   status: "ON_TIME",
   delayMinutes: 0,
   delayReason: null,
@@ -34,6 +41,7 @@ const mockStatusDelayed = {
   delayMinutes: 45,
   delayReason: "Weather conditions",
   estimatedDeparture: "2026-03-06T10:45:00Z",
+  estimatedArrival: "2026-03-06T12:45:00Z",
 };
 
 const mockStatusCancelled = {
@@ -76,6 +84,7 @@ describe("FlightStatusTracker", () => {
     });
     expect(screen.getByText("DEL")).toBeInTheDocument();
     expect(screen.getByText("BOM")).toBeInTheDocument();
+    expect(screen.getByText(/Estimated Arrival/)).toBeInTheDocument();
   });
 
   it("renders DELAYED status with delay reason", async () => {

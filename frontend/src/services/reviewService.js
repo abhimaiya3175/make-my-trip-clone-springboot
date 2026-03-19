@@ -11,12 +11,8 @@ import api, { unwrapApiResponse } from "@/utils/api";
  */
 export const createReview = async (userId, userName, reviewData) => {
   try {
-    const res = await api.post(`/api/reviews`, reviewData, {
-      headers: {
-        'X-User-ID': userId,
-        'X-User-Name': userName
-      }
-    });
+    const payload = { ...reviewData, userName };
+    const res = await api.post(`/api/reviews`, payload);
     return unwrapApiResponse(res);
   } catch (error) {
     console.error('Create review error:', error);
@@ -65,11 +61,7 @@ export const getReviewById = async (reviewId) => {
  */
 export const updateReview = async (reviewId, userId, reviewData) => {
   try {
-    const res = await api.put(`/api/reviews/${reviewId}`, reviewData, {
-      headers: {
-        'X-User-ID': userId
-      }
-    });
+    const res = await api.put(`/api/reviews/${reviewId}`, reviewData);
     return unwrapApiResponse(res);
   } catch (error) {
     console.error('Update review error:', error);
@@ -85,11 +77,7 @@ export const updateReview = async (reviewId, userId, reviewData) => {
  */
 export const voteHelpful = async (reviewId, userId) => {
   try {
-    const res = await api.put(`/api/reviews/${reviewId}/helpful`, {}, {
-      headers: {
-        'X-User-ID': userId
-      }
-    });
+    const res = await api.put(`/api/reviews/${reviewId}/helpful`, {});
     return unwrapApiResponse(res);
   } catch (error) {
     console.error('Vote helpful error:', error);
@@ -106,11 +94,7 @@ export const voteHelpful = async (reviewId, userId) => {
  */
 export const flagReview = async (reviewId, userId, reason) => {
   try {
-    const res = await api.post(`/api/reviews/${reviewId}/flag`, { reason }, {
-      headers: {
-        'X-User-ID': userId
-      }
-    });
+    const res = await api.post(`/api/reviews/${reviewId}/flag`, { reason });
     return unwrapApiResponse(res);
   } catch (error) {
     console.error('Flag review error:', error);
@@ -127,11 +111,7 @@ export const flagReview = async (reviewId, userId, reason) => {
  */
 export const replyToReview = async (reviewId, userId, replyData) => {
   try {
-    const res = await api.post(`/api/reviews/${reviewId}/reply`, replyData, {
-      headers: {
-        'X-User-ID': userId
-      }
-    });
+    const res = await api.post(`/api/reviews/${reviewId}/reply`, replyData);
     return unwrapApiResponse(res);
   } catch (error) {
     console.error('Reply to review error:', error);
@@ -147,11 +127,7 @@ export const replyToReview = async (reviewId, userId, replyData) => {
  */
 export const deleteReview = async (reviewId, userId) => {
   try {
-    await api.delete(`/api/reviews/${reviewId}`, {
-      headers: {
-        'X-User-ID': userId
-      }
-    });
+    await api.delete(`/api/reviews/${reviewId}`);
   } catch (error) {
     console.error('Delete review error:', error);
     throw error;

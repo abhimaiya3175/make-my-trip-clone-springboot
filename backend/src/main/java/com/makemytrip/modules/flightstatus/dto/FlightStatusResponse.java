@@ -19,6 +19,8 @@ public class FlightStatusResponse {
     private String destination;
     private LocalDateTime scheduledDeparture;
     private LocalDateTime estimatedDeparture;
+    private LocalDateTime scheduledArrival;
+    private LocalDateTime estimatedArrival;
     private FlightStatusEnum status;
     private Integer delayMinutes;
     private String delayReason;

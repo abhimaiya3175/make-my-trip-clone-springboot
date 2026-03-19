@@ -22,6 +22,7 @@ public class RoomResponse {
     private int maxOccupancy;
     private List<String> amenities;
     private List<String> images;
+    private boolean isPanorama;
     private boolean locked;
     private boolean lockedByMe;
 }

@@ -1,15 +1,30 @@
 package com.makemytrip.modules.cancellation.dto;
 
 import com.makemytrip.modules.cancellation.model.CancellationReason;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 
 /**
  * DTO for cancellation request from frontend
  */
 public class CancellationRequestDTO {
+    @NotBlank(message = "Booking ID is required")
     private String bookingId;
+
+    @NotBlank(message = "Booking type is required")
+    @Pattern(regexp = "(?i)FLIGHT|HOTEL", message = "Booking type must be FLIGHT or HOTEL")
     private String bookingType; // FLIGHT or HOTEL
+
+    @NotNull(message = "Cancellation reason is required")
     private CancellationReason reason;
+
+    @Min(value = 1, message = "Quantity to cancel must be at least 1")
     private int quantityToCancel; // for partial cancellation
+
+    @Size(max = 1000, message = "Additional notes cannot exceed 1000 characters")
     private String additionalNotes;
 
     // Constructors

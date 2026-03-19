@@ -2,6 +2,7 @@ package com.makemytrip.modules.auth.model;
 
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.util.List;
@@ -39,9 +40,12 @@ public class User {
     public String getPhoneNumber() {
         return phoneNumber;
     }
+    @JsonIgnore
     public String getPassword() {return password;}
     public String getEmail() {return email;}
+    public void setEmail(String email) {this.email = email;}
     public String getRole() {return role;}
+    @JsonProperty
     public void setPassword(String password) {this.password = password;}
     public void setRole(String role) {this.role = role;}
     public List<com.makemytrip.modules.booking.model.Booking> getBookings(){return bookings;}

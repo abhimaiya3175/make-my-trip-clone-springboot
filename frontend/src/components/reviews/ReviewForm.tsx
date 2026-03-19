@@ -21,32 +21,50 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
 }) => {
   const [rating, setRating] = useState(0);
   const [text, setText] = useState('');
-  const [photos, setPhotos] = useState<string[]>([]);
-  const [photoInput, setPhotoInput] = useState('');
+  const [photos, setPhotos] = useState<File[]>([]);
+  const [photoPreviews, setPhotoPreviews] = useState<string[]>([]);
+  const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
   const [requestState, setRequestState] = useState(REQUEST_STATE.IDLE);
   const [error, setError] = useState<string | null>(null);
 
-  const handleAddPhoto = () => {
-    if (!photoInput.trim()) return;
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files) return;
+    const selectedFiles = Array.from(e.target.files);
     
-    if (photos.length >= 5) {
+    if (photos.length + selectedFiles.length > 5) {
       setError('Maximum 5 photos allowed');
       return;
     }
 
-    // Basic URL validation
-    try {
-      new URL(photoInput);
-      setPhotos([...photos, photoInput.trim()]);
-      setPhotoInput('');
-      setError(null);
-    } catch {
-      setError('Please enter a valid URL');
+    for (const file of selectedFiles) {
+      if (file.size > 5 * 1024 * 1024) {
+        setError(`File ${file.name} exceeds 5MB limit`);
+        return;
+      }
+      if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+        setError(`File ${file.name} is not a supported format (JPEG, PNG, WEBP)`);
+        return;
+      }
     }
+
+    const newPhotos = [...photos, ...selectedFiles];
+    setPhotos(newPhotos);
+    
+    // Generate previews
+    const newPreviews = selectedFiles.map(f => URL.createObjectURL(f));
+    setPhotoPreviews([...photoPreviews, ...newPreviews]);
+    setError(null);
+    
+    // Reset input
+    e.target.value = '';
   };
 
   const handleRemovePhoto = (index: number) => {
+    // Revoke object URL to avoid memory leaks
+    URL.revokeObjectURL(photoPreviews[index]);
+    
     setPhotos(photos.filter((_, i) => i !== index));
+    setPhotoPreviews(photoPreviews.filter((_, i) => i !== index));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -77,12 +95,29 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
     setRequestState(REQUEST_STATE.LOADING);
 
     try {
+      const uploadedUrls: string[] = [];
+      for (const file of photos) {
+        const formData = new FormData();
+        formData.append('photo', file);
+
+        const res = await fetch(`${API_BASE}/api/reviews/upload-photo`, {
+          method: 'POST',
+          body: formData,
+        });
+        
+        const json = await res.json();
+        if (!res.ok) {
+          throw new Error(json.error?.message || 'Failed to upload photo');
+        }
+        uploadedUrls.push(json.data);
+      }
+
       await createReview(userId, userName || 'Anonymous', {
         entityId,
         entityType,
         rating,
         text: text.trim(),
-        photos: photos.length > 0 ? photos : undefined
+        photos: uploadedUrls.length > 0 ? uploadedUrls : undefined
       });
 
       setRequestState(REQUEST_STATE.SUCCESS);
@@ -91,6 +126,8 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
       setRating(0);
       setText('');
       setPhotos([]);
+      photoPreviews.forEach(p => URL.revokeObjectURL(p));
+      setPhotoPreviews([]);
       
       // Call success callback
       if (onSuccess) {
@@ -143,49 +180,52 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
             Photos (optional, max 5)
           </label>
           
-          {/* Photo Input */}
           <div className="flex gap-2 mb-3">
             <input
-              type="text"
-              value={photoInput}
-              onChange={(e) => setPhotoInput(e.target.value)}
-              placeholder="Enter image URL"
-              className="flex-1 p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-              onKeyPress={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  handleAddPhoto();
-                }
-              }}
-            />
-            <button
-              type="button"
-              onClick={handleAddPhoto}
+              type="file"
+              accept="image/jpeg, image/png, image/webp"
+              multiple
+              onChange={handleFileSelect}
               disabled={photos.length >= 5}
-              className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              id="photo-upload"
+              className="hidden"
+            />
+            <label
+              htmlFor="photo-upload"
+              className={`px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 flex items-center gap-2 cursor-pointer ${
+                photos.length >= 5 ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
             >
               <Image className="w-4 h-4" />
-              Add
-            </button>
+              Select Photos
+            </label>
+            <span className="text-sm text-gray-400 mt-2">
+              Max 5MB per file (JPEG, PNG, WEBP)
+            </span>
           </div>
 
           {/* Photo Preview */}
-          {photos.length > 0 && (
+          {photoPreviews.length > 0 && (
             <div className="flex gap-2 flex-wrap">
-              {photos.map((photo, index) => (
+              {photoPreviews.map((preview, index) => (
                 <div key={index} className="relative">
                   <img
-                    src={photo}
+                    src={preview}
                     alt={`Preview ${index + 1}`}
                     className="w-20 h-20 object-cover rounded-md border border-gray-200"
                   />
                   <button
                     type="button"
                     onClick={() => handleRemovePhoto(index)}
-                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 shadow-sm"
                   >
                     <X className="w-3 h-3" />
                   </button>
+                  {requestState === REQUEST_STATE.LOADING && (
+                    <div className="absolute inset-0 bg-white/60 flex items-center justify-center rounded-md">
+                      <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

@@ -8,9 +8,12 @@ import com.makemytrip.modules.booking.dto.CancelBookingRequest;
 import com.makemytrip.modules.booking.dto.CreateBookingRequest;
 import com.makemytrip.modules.booking.model.Booking;
 import com.makemytrip.modules.booking.service.BookingService;
+import com.makemytrip.security.AuthContext;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -28,19 +31,23 @@ public class BookingController {
      */
     @PostMapping
     public ResponseEntity<ApiResponse<Booking>> createBooking(
-            @RequestHeader(name = ApiHeaders.USER_ID, required = false) String userId,
             @RequestHeader(name = ApiHeaders.REQUEST_ID, required = false) String requestId,
-            @RequestBody CreateBookingRequest request) {
+            Authentication authentication,
+            @Valid @RequestBody CreateBookingRequest request) {
         
         String reqId = requestId != null ? requestId : UUID.randomUUID().toString();
         
+        String userId = AuthContext.userId(authentication);
         if (userId == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(ApiResponse.fail(new ApiError("UNAUTHORIZED", "User ID is required", null), reqId));
+            .body(ApiResponse.fail(new ApiError("UNAUTHORIZED", "Authentication is required", null), reqId));
         }
         
         try {
             request.setUserId(userId);
+            if (request.getUserName() == null || request.getUserName().isBlank()) {
+                request.setUserName(AuthContext.userName(authentication));
+            }
             Booking booking = bookingService.createBooking(request);
             return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.ok(booking, reqId));
@@ -57,14 +64,32 @@ public class BookingController {
     @GetMapping("/{bookingId}")
     public ResponseEntity<ApiResponse<Booking>> getBooking(
             @PathVariable String bookingId,
+            Authentication authentication,
             @RequestHeader(name = ApiHeaders.REQUEST_ID, required = false) String requestId) {
         
         String reqId = requestId != null ? requestId : UUID.randomUUID().toString();
         
-        return bookingService.getBookingById(bookingId)
-            .map(booking -> ResponseEntity.ok(ApiResponse.ok(booking, reqId)))
-            .orElse(ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(ApiResponse.fail(new ApiError("NOT_FOUND", "Booking not found", null), reqId)));
+        String userId = AuthContext.userId(authentication);
+        if (userId == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(ApiResponse.fail(new ApiError("UNAUTHORIZED", "Authentication is required", null), reqId));
+        }
+
+        java.util.Optional<Booking> bookingOpt = bookingService.getBookingById(bookingId);
+        if (bookingOpt.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.fail(new ApiError("NOT_FOUND", "Booking not found", null), reqId));
+        }
+
+        Booking booking = bookingOpt.get();
+        boolean owner = userId.equals(booking.getUserId());
+        boolean admin = AuthContext.hasRole(authentication, "ADMIN");
+        if (!owner && !admin) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(ApiResponse.fail(new ApiError("FORBIDDEN", "Access denied", null), reqId));
+        }
+
+        return ResponseEntity.ok(ApiResponse.ok(booking, reqId));
     }
 
     /**
@@ -73,14 +98,15 @@ public class BookingController {
      */
     @GetMapping
     public ResponseEntity<ApiResponse<List<Booking>>> getUserBookings(
-            @RequestHeader(name = ApiHeaders.USER_ID, required = false) String userId,
-            @RequestHeader(name = ApiHeaders.REQUEST_ID, required = false) String requestId) {
-        
+            @RequestHeader(name = ApiHeaders.REQUEST_ID, required = false) String requestId,
+            Authentication authentication) {
+
         String reqId = requestId != null ? requestId : UUID.randomUUID().toString();
-        
+
+        String userId = AuthContext.userId(authentication);
         if (userId == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(ApiResponse.fail(new ApiError("UNAUTHORIZED", "User ID is required", null), reqId));
+                .body(ApiResponse.fail(new ApiError("UNAUTHORIZED", "Authentication is required", null), reqId));
         }
         
         List<Booking> bookings = bookingService.getUserBookings(userId);
@@ -129,15 +155,16 @@ public class BookingController {
     @PostMapping("/{bookingId}/cancel")
     public ResponseEntity<ApiResponse<Booking>> cancelBooking(
             @PathVariable String bookingId,
-            @RequestHeader(name = ApiHeaders.USER_ID, required = false) String userId,
             @RequestHeader(name = ApiHeaders.REQUEST_ID, required = false) String requestId,
+            Authentication authentication,
             @RequestBody(required = false) CancelBookingRequest request) {
         
         String reqId = requestId != null ? requestId : UUID.randomUUID().toString();
         
+        String userId = AuthContext.userId(authentication);
         if (userId == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(ApiResponse.fail(new ApiError("UNAUTHORIZED", "User ID is required", null), reqId));
+            .body(ApiResponse.fail(new ApiError("UNAUTHORIZED", "Authentication is required", null), reqId));
         }
         
         try {
@@ -168,14 +195,15 @@ public class BookingController {
     @PostMapping("/{bookingId}/review-submitted")
     public ResponseEntity<ApiResponse<Booking>> markReviewSubmitted(
             @PathVariable String bookingId,
-            @RequestHeader(name = ApiHeaders.USER_ID, required = false) String userId,
-            @RequestHeader(name = ApiHeaders.REQUEST_ID, required = false) String requestId) {
-        
+            @RequestHeader(name = ApiHeaders.REQUEST_ID, required = false) String requestId,
+            Authentication authentication) {
+
         String reqId = requestId != null ? requestId : UUID.randomUUID().toString();
-        
+
+        String userId = AuthContext.userId(authentication);
         if (userId == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(ApiResponse.fail(new ApiError("UNAUTHORIZED", "User ID is required", null), reqId));
+                .body(ApiResponse.fail(new ApiError("UNAUTHORIZED", "Authentication is required", null), reqId));
         }
         
         try {

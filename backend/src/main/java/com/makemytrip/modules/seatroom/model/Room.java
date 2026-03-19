@@ -30,6 +30,7 @@ public class Room {
     private int maxOccupancy;
     private List<String> amenities;  // e.g. ["WiFi", "Mini Bar", "Balcony"]
     private List<String> images;     // URLs for room preview carousel
+    private boolean isPanorama;      // true = treat first image as 360-degree equirectangular
 
     // Lock fields for optimistic concurrency
     private String lockedByUserId;

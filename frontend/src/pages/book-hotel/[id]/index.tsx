@@ -165,6 +165,11 @@ const BookHotelPage = () => {
       dispatch(setUser(updateuser));
       setopem(false);
       setQuantity(1);
+      const bookingId = data?.id || data?._id;
+      if (bookingId) {
+        router.push(`/booking/confirmation?bookingId=${encodeURIComponent(bookingId)}&type=hotel`);
+        return;
+      }
       router.push("/profile");
     } catch (error) {
       console.log(error);

@@ -24,8 +24,8 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onSwitchToSignup }) =>
       } else {
         setError("Invalid email or password");
       }
-    } catch (err) {
-      setError("Login failed. Please try again.");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Login failed. Please try again.");
     }
   };
 

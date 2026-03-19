@@ -1,0 +1,18 @@
+﻿[INFO] Scanning for projects...
+[INFO] 
+[INFO] ---------------------< com.makemytrip:makemytrip >----------------------
+[INFO] Building makemytrip 0.0.1-SNAPSHOT
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ makemytrip ---
+[INFO] Copying 7 resources from backend\src\main\resources to target\classes
+[INFO] 
+[INFO] --- compiler:3.13.0:compile (default-compile) @ makemytrip ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  1.314 s
+[INFO] Finished at: 2026-03-19T17:06:32+05:30
+[INFO] ------------------------------------------------------------------------

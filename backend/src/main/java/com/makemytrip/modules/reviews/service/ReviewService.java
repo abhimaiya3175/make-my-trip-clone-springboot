@@ -172,7 +172,14 @@ public class ReviewService {
         return reviewRepository.findById(id);
     }
 
-    public void deleteReview(String id) {
+    public void deleteReview(String id, String userId) {
+        Review review = reviewRepository.findById(id)
+            .orElseThrow(() -> new IllegalArgumentException("Review not found"));
+
+        if (!review.getUserId().equals(userId)) {
+            throw new IllegalArgumentException("User can only delete their own review");
+        }
+
         reviewRepository.deleteById(id);
     }
 

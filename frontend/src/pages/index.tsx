@@ -268,7 +268,7 @@ export default function Home() {
               <SignupDialog
                 trigger={
                   <Button variant="outline" className="bg-blue-600 text-white hover:bg-blue-700">
-                    Sign Up
+                    Login
                   </Button>
                 }
               />

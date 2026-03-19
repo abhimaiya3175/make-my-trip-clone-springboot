@@ -49,6 +49,14 @@ const index = () => {
     }
 
     const userId = user.id || user._id;
+    const hasAuthToken = typeof window !== "undefined" && !!localStorage.getItem("authToken");
+
+    if (!hasAuthToken) {
+      console.warn("[Profile] auth token missing; clearing stale session");
+      dispatch(clearUser());
+      router.push("/");
+      return;
+    }
 
     if (!userId) {
       console.error("[Profile] ERROR: Neither user.id nor user._id exists!", "Full user object:", JSON.stringify(user));

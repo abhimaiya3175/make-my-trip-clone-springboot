@@ -1,16 +1,32 @@
 package com.makemytrip.modules.booking.dto;
 
 import com.makemytrip.modules.booking.model.EntityType;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Future;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 
 import java.time.LocalDate;
 
 public class CreateBookingRequest {
+    @NotNull(message = "Entity type is required")
     private EntityType entityType;
+
+    @NotBlank(message = "Entity ID is required")
     private String entityId;
+
     private String userId;
     private String userName;
+
+    @Min(value = 1, message = "Quantity must be at least 1")
     private int quantity;
+
+    @DecimalMin(value = "0.01", message = "Total price must be greater than 0")
     private double totalPrice;
+
+    @NotNull(message = "Travel date is required")
+    @Future(message = "Travel date must be in the future")
     private LocalDate travelDate;
 
     // Getters and Setters

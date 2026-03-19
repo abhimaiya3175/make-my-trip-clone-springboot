@@ -34,7 +34,9 @@ class FlightStatusServiceTest {
                 .origin("BLR")
                 .destination("DEL")
                 .scheduledDeparture(LocalDateTime.of(2026, 3, 10, 8, 0))
+                .scheduledArrival(LocalDateTime.of(2026, 3, 10, 10, 0))
                 .estimatedDeparture(LocalDateTime.of(2026, 3, 10, 8, 0))
+                .estimatedArrival(LocalDateTime.of(2026, 3, 10, 10, 0))
                 .status(FlightStatusEnum.ON_TIME)
                 .delayMinutes(0)
                 .lastUpdated(LocalDateTime.now())
@@ -98,6 +100,7 @@ class FlightStatusServiceTest {
         fs.setDelayMinutes(45);
         fs.setDelayReason("Weather conditions");
         fs.setEstimatedDeparture(fs.getScheduledDeparture().plusMinutes(45));
+        fs.setEstimatedArrival(fs.getScheduledArrival().plusMinutes(45));
         when(repository.findByFlightId("6E-2024")).thenReturn(Optional.of(fs));
 
         FlightStatusResponse result = service.getStatus("6E-2024");
@@ -105,5 +108,7 @@ class FlightStatusServiceTest {
         assertThat(result.getStatus()).isEqualTo(FlightStatusEnum.DELAYED);
         assertThat(result.getDelayMinutes()).isEqualTo(45);
         assertThat(result.getDelayReason()).isEqualTo("Weather conditions");
+        assertThat(result.getEstimatedArrival())
+            .isEqualTo(result.getScheduledArrival().plusMinutes(result.getDelayMinutes()));
     }
 }

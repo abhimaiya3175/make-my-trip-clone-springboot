@@ -1,12 +1,26 @@
 import axios from "axios";
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080";
+const BACKEND_URL =
+  process.env.NEXT_PUBLIC_BACKEND_URL ||
+  process.env.NEXT_PUBLIC_API_URL ||
+  "http://localhost:8080";
 
 const api = axios.create({
   baseURL: BACKEND_URL,
   headers: {
     "Content-Type": "application/json",
   },
+});
+
+api.interceptors.request.use((config) => {
+  if (typeof window !== "undefined" && localStorage) {
+    const token = localStorage.getItem("authToken");
+    if (token) {
+      config.headers = config.headers || {};
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+  }
+  return config;
 });
 
 export const unwrapApiResponse = (resOrBody) => {

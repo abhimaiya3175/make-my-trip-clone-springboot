@@ -14,16 +14,18 @@ import { signup, login } from "../api";
 import { setUser } from "@/store";
 import { useDispatch } from "react-redux";
 const SignupDialog = ({trigger}:any) => {
-  const [isSignup, setIsSignup] = useState(true);
+  const [isSignup, setIsSignup] = useState(false);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [open, setopem] = useState(false);
+  const [authError, setAuthError] = useState("");
   const dispatch = useDispatch();
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
+    setAuthError("");
     if (isSignup) {
       try {
         const signin = await signup(
@@ -33,18 +35,30 @@ const SignupDialog = ({trigger}:any) => {
           phoneNumber,
           password
         );
+        if (!signin) {
+          setAuthError("Signup failed. Please try again.");
+          return;
+        }
         dispatch(setUser(signin));
+        setopem(false);
+        clearform();
       } catch (error) {
         console.log(error);
+        setAuthError(error instanceof Error ? error.message : "Signup failed. Please try again.");
       }
     } else {
       try {
         const data = await login(email, password);
+        if (!data) {
+          setAuthError("Invalid email or password.");
+          return;
+        }
         dispatch(setUser(data));
         setopem(false);
         clearform();
       } catch (error) {
         console.log(error);
+        setAuthError(error instanceof Error ? error.message : "Login failed. Please try again.");
       }
     }
   };
@@ -133,6 +147,9 @@ const SignupDialog = ({trigger}:any) => {
           >
             {isSignup ? "Sign Up" : "Login"}
           </Button>
+          {authError && (
+            <p className="text-sm text-red-600 text-center">{authError}</p>
+          )}
         </form>
         <div className="text-center text-sm">
           {isSignup ? (

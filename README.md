@@ -434,9 +434,49 @@ spring.data.mongodb.database=makemytrip
 # CORS Configuration
 spring.web.cors.allowed-origins=http://localhost:3000
 
+# JWT Configuration (recommended: set via env var)
+app.jwt.secret=${JWT_SECRET:change-this-to-a-long-random-secret}
+app.jwt.expiration-ms=86400000
+
+# Web Push (VAPID)
+vapid.public.key=${VAPID_PUBLIC_KEY:replace-with-generated-vapid-public-key}
+vapid.private.key=${VAPID_PRIVATE_KEY:replace-with-generated-vapid-private-key}
+vapid.subject=${VAPID_SUBJECT:mailto:admin@example.com}
+
 # Logging (optional)
 logging.level.com.makemytrip=INFO
 logging.level.org.springframework.data.mongodb=DEBUG
+
+# Uploads Directory (Local storage for review photos)
+app.upload.dir=${UPLOAD_DIR:./uploads/reviews/}
+```
+
+Set JWT secret from environment before starting backend:
+
+```powershell
+$env:JWT_SECRET="replace-with-a-strong-secret-at-least-32-characters"
+```
+
+```bash
+export JWT_SECRET="replace-with-a-strong-secret-at-least-32-characters"
+```
+
+Generate VAPID keys (choose one):
+
+```bash
+npx web-push generate-vapid-keys
+```
+
+```bash
+web-push generate-vapid-keys
+```
+
+Then set these environment variables before starting backend:
+
+```powershell
+$env:VAPID_PUBLIC_KEY="your-generated-public-key"
+$env:VAPID_PRIVATE_KEY="your-generated-private-key"
+$env:VAPID_SUBJECT="mailto:admin@example.com"
 ```
 
 ### Frontend Configuration

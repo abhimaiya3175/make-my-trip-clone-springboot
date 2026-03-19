@@ -4,11 +4,14 @@ import com.makemytrip.modules.cancellation.dto.*;
 import com.makemytrip.modules.cancellation.model.RefundStatus;
 import com.makemytrip.modules.cancellation.service.CancellationService;
 import com.makemytrip.modules.cancellation.service.RefundCalculationService;
+import com.makemytrip.security.AuthContext;
+import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -82,13 +85,19 @@ public class CancellationController {
      */
     @PostMapping("/cancel")
     public ResponseEntity<?> cancelBooking(
-            @RequestHeader(value = "X-User-ID", required = false) String userId,
-            @RequestBody CancellationRequestDTO request,
+            Authentication authentication,
+            @Valid @RequestBody CancellationRequestDTO request,
             @RequestParam int totalQuantity,
             @RequestParam double originalPrice,
             @RequestParam String travelDateTimeString) {
 
         try {
+            String userId = AuthContext.userId(authentication);
+            if (userId == null || userId.isBlank()) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(errorResponse("Authentication is required"));
+            }
+
             log.info("[CANCEL] userId={}, bookingId={}, type={}, reason={}", 
                 userId, request.getBookingId(), request.getBookingType(), request.getReason());
             log.info("[CANCEL] quantityToCancel={}, totalQuantity={}, originalPrice={}, travelDate={}", 
@@ -116,12 +125,6 @@ public class CancellationController {
 
             LocalDateTime travelDateTime = RefundCalculationService.parseTravelDate(travelDateTimeString);
             log.info("[CANCEL] Parsed travelDateTime: {}", travelDateTime);
-
-            // Generate or use provided userId
-            if (userId == null || userId.isEmpty()) {
-                userId = "user-" + System.currentTimeMillis();
-                log.warn("[CANCEL] No userId header, using fallback: {}", userId);
-            }
 
             CancellationResponseDTO response = cancellationService.cancelBooking(
                 userId, request, totalQuantity, originalPrice, travelDateTime
@@ -172,8 +175,16 @@ public class CancellationController {
      * @return List of cancellations with refund details
      */
     @GetMapping("/user/{userId}/cancellations")
-    public ResponseEntity<?> getUserCancellations(@PathVariable String userId) {
+    public ResponseEntity<?> getUserCancellations(
+            @PathVariable String userId,
+            Authentication authentication) {
         try {
+            String currentUserId = AuthContext.userId(authentication);
+            boolean admin = AuthContext.hasRole(authentication, "ADMIN");
+            if (currentUserId == null || (!admin && !currentUserId.equals(userId))) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(errorResponse("Access denied"));
+            }
+
             log.info("[GET_USER_CANCELLATIONS] START userId={}, type={}, isEmpty={}", 
                 userId, userId == null ? "null" : userId.getClass().getSimpleName(), 
                 userId == null ? "N/A" : userId.isEmpty());

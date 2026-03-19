@@ -4,17 +4,30 @@ import com.makemytrip.common.api.ApiError;
 import com.makemytrip.common.api.ApiHeaders;
 import com.makemytrip.common.api.ApiResponse;
 import com.makemytrip.common.api.PageResponse;
+import com.makemytrip.modules.auth.model.User;
+import com.makemytrip.modules.auth.service.AuthService;
 import com.makemytrip.modules.reviews.dto.CreateReviewRequest;
 import com.makemytrip.modules.reviews.dto.FlagReviewRequest;
 import com.makemytrip.modules.reviews.dto.ReplyReviewRequest;
 import com.makemytrip.modules.reviews.model.EntityType;
 import com.makemytrip.modules.reviews.model.Review;
 import com.makemytrip.modules.reviews.service.ReviewService;
+import com.makemytrip.security.AuthContext;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.List;
 import java.util.UUID;
 
@@ -24,22 +37,37 @@ public class ReviewController {
     @Autowired
     private ReviewService reviewService;
 
+    @Autowired
+    private AuthService authService;
+
+    @Value("${app.upload.dir:./uploads/reviews/}")
+    private String uploadDir;
+
     /**
      * Create a new review
      * POST /api/reviews
      */
     @PostMapping
     public ResponseEntity<ApiResponse<Review>> createReview(
-            @RequestHeader(name = ApiHeaders.USER_ID, required = false) String userId,
             @RequestHeader(name = ApiHeaders.REQUEST_ID, required = false) String requestId,
-            @RequestHeader(name = "X-User-Name", required = false, defaultValue = "Anonymous") String userName,
-            @RequestBody CreateReviewRequest request) {
+            Authentication authentication,
+            @Valid @RequestBody CreateReviewRequest request) {
         
         String reqId = requestId != null ? requestId : UUID.randomUUID().toString();
         
+        String userId = AuthContext.userId(authentication);
         if (userId == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(ApiResponse.fail(new ApiError("UNAUTHORIZED", "User ID is required", null), reqId));
+            .body(ApiResponse.fail(new ApiError("UNAUTHORIZED", "Authentication is required", null), reqId));
+        }
+
+        String userName = AuthContext.userName(authentication);
+        if (userName == null || userName.isBlank()) {
+            User user = authService.getUserById(userId);
+            userName = user != null
+                ? ((user.getFirstName() == null ? "" : user.getFirstName()) + " "
+                + (user.getLastName() == null ? "" : user.getLastName())).trim()
+                : "Anonymous";
         }
         
         try {
@@ -49,6 +77,50 @@ public class ReviewController {
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest()
                 .body(ApiResponse.fail(new ApiError("BAD_REQUEST", e.getMessage(), null), reqId));
+        }
+    }
+
+    /**
+     * Upload a review photo
+     * POST /api/reviews/upload-photo
+     */
+    @PostMapping("/upload-photo")
+    public ResponseEntity<ApiResponse<String>> uploadPhoto(
+            @RequestParam("photo") MultipartFile photo,
+            @RequestHeader(name = ApiHeaders.REQUEST_ID, required = false) String requestId) {
+        
+        String reqId = requestId != null ? requestId : UUID.randomUUID().toString();
+        
+        // Validate size max 5MB
+        if (photo.getSize() > 5 * 1024 * 1024) {
+            return ResponseEntity.badRequest()
+                .body(ApiResponse.fail(new ApiError("VALIDATION_FAILED", "File size exceeds 5MB limit", null), reqId));
+        }
+
+        // Validate type jpeg/png/webp
+        String contentType = photo.getContentType();
+        if (contentType == null || !(contentType.equals("image/jpeg") || contentType.equals("image/png") || contentType.equals("image/webp"))) {
+            return ResponseEntity.badRequest()
+                .body(ApiResponse.fail(new ApiError("VALIDATION_FAILED", "Only JPEG, PNG, and WEBP formats are allowed", null), reqId));
+        }
+
+        try {
+            Path uploadPath = Paths.get(uploadDir);
+            if (!Files.exists(uploadPath)) {
+                Files.createDirectories(uploadPath);
+            }
+
+            String originalName = photo.getOriginalFilename();
+            String cleanName = originalName != null && !originalName.isBlank() ? StringUtils.cleanPath(originalName) : "image.jpg";
+            String filename = UUID.randomUUID().toString() + "_" + cleanName;
+            Path filePath = uploadPath.resolve(filename);
+            Files.copy(photo.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
+
+            String fileUrl = "/uploads/reviews/" + filename;
+            return ResponseEntity.ok(ApiResponse.ok(fileUrl, reqId));
+        } catch (IOException e) {
+            return ResponseEntity.internalServerError()
+                .body(ApiResponse.fail(new ApiError("INTERNAL_SERVER_ERROR", "Failed to upload file", null), reqId));
         }
     }
 
@@ -100,15 +172,16 @@ public class ReviewController {
     @PutMapping("/{reviewId}")
     public ResponseEntity<ApiResponse<Review>> updateReview(
             @PathVariable String reviewId,
-            @RequestHeader(name = ApiHeaders.USER_ID, required = false) String userId,
             @RequestHeader(name = ApiHeaders.REQUEST_ID, required = false) String requestId,
-            @RequestBody CreateReviewRequest request) {
+            Authentication authentication,
+            @Valid @RequestBody CreateReviewRequest request) {
         
         String reqId = requestId != null ? requestId : UUID.randomUUID().toString();
         
+        String userId = AuthContext.userId(authentication);
         if (userId == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(ApiResponse.fail(new ApiError("UNAUTHORIZED", "User ID is required", null), reqId));
+            .body(ApiResponse.fail(new ApiError("UNAUTHORIZED", "Authentication is required", null), reqId));
         }
         
         try {
@@ -127,14 +200,15 @@ public class ReviewController {
     @PutMapping("/{reviewId}/helpful")
     public ResponseEntity<ApiResponse<Review>> voteHelpful(
             @PathVariable String reviewId,
-            @RequestHeader(name = ApiHeaders.USER_ID, required = false) String userId,
-            @RequestHeader(name = ApiHeaders.REQUEST_ID, required = false) String requestId) {
+            @RequestHeader(name = ApiHeaders.REQUEST_ID, required = false) String requestId,
+            Authentication authentication) {
         
         String reqId = requestId != null ? requestId : UUID.randomUUID().toString();
         
+        String userId = AuthContext.userId(authentication);
         if (userId == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(ApiResponse.fail(new ApiError("UNAUTHORIZED", "User ID is required", null), reqId));
+            .body(ApiResponse.fail(new ApiError("UNAUTHORIZED", "Authentication is required", null), reqId));
         }
         
         try {
@@ -153,15 +227,16 @@ public class ReviewController {
     @PostMapping("/{reviewId}/flag")
     public ResponseEntity<ApiResponse<Review>> flagReview(
             @PathVariable String reviewId,
-            @RequestHeader(name = ApiHeaders.USER_ID, required = false) String userId,
             @RequestHeader(name = ApiHeaders.REQUEST_ID, required = false) String requestId,
+            Authentication authentication,
             @RequestBody FlagReviewRequest request) {
         
         String reqId = requestId != null ? requestId : UUID.randomUUID().toString();
         
+        String userId = AuthContext.userId(authentication);
         if (userId == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(ApiResponse.fail(new ApiError("UNAUTHORIZED", "User ID is required", null), reqId));
+            .body(ApiResponse.fail(new ApiError("UNAUTHORIZED", "Authentication is required", null), reqId));
         }
         
         try {
@@ -180,16 +255,22 @@ public class ReviewController {
     @PostMapping("/{reviewId}/reply")
     public ResponseEntity<ApiResponse<Review>> replyToReview(
             @PathVariable String reviewId,
-            @RequestHeader(name = ApiHeaders.USER_ID, required = false) String userId,
             @RequestHeader(name = ApiHeaders.REQUEST_ID, required = false) String requestId,
+            Authentication authentication,
             @RequestBody ReplyReviewRequest request) {
         
         String reqId = requestId != null ? requestId : UUID.randomUUID().toString();
         
+        String userId = AuthContext.userId(authentication);
         if (userId == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(ApiResponse.fail(new ApiError("UNAUTHORIZED", "User ID is required", null), reqId));
+                .body(ApiResponse.fail(new ApiError("UNAUTHORIZED", "Authentication is required", null), reqId));
         }
+
+        if (request.getUserName() == null || request.getUserName().isBlank()) {
+            request.setUserName(AuthContext.userName(authentication));
+        }
+        request.setOwner(AuthContext.hasRole(authentication, "ADMIN"));
         
         try {
             Review review = reviewService.replyToReview(reviewId, userId, request);
@@ -207,18 +288,19 @@ public class ReviewController {
     @DeleteMapping("/{reviewId}")
     public ResponseEntity<ApiResponse<Void>> deleteReview(
             @PathVariable String reviewId,
-            @RequestHeader(name = ApiHeaders.USER_ID, required = false) String userId,
-            @RequestHeader(name = ApiHeaders.REQUEST_ID, required = false) String requestId) {
+            @RequestHeader(name = ApiHeaders.REQUEST_ID, required = false) String requestId,
+            Authentication authentication) {
         
         String reqId = requestId != null ? requestId : UUID.randomUUID().toString();
         
+        String userId = AuthContext.userId(authentication);
         if (userId == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(ApiResponse.fail(new ApiError("UNAUTHORIZED", "User ID is required", null), reqId));
+            .body(ApiResponse.fail(new ApiError("UNAUTHORIZED", "Authentication is required", null), reqId));
         }
         
         try {
-            reviewService.deleteReview(reviewId);
+            reviewService.deleteReview(reviewId, userId);
             return ResponseEntity.ok(ApiResponse.ok(null, reqId));
         } catch (Exception e) {
             return ResponseEntity.badRequest()

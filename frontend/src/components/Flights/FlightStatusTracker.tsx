@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/router";
-import { getFlightStatus } from "@/services/flightStatusService";
+import { getFlightStatus, getVapidPublicKey, subscribeToFlightStatus } from "@/services/flightStatusService";
 import FlightTimeline from "./FlightTimeline";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
+import { Bell, BellOff } from "lucide-react";
 
 interface FlightStatusData {
   flightId: string;
@@ -14,6 +15,8 @@ interface FlightStatusData {
   destination: string;
   scheduledDeparture: string;
   estimatedDeparture: string;
+  scheduledArrival: string;
+  estimatedArrival: string;
   status: "ON_TIME" | "DELAYED" | "BOARDING" | "LANDED" | "CANCELLED";
   delayMinutes: number;
   delayReason: string | null;
@@ -29,6 +32,12 @@ const FlightStatusTracker: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [lastStatus, setLastStatus] = useState<string | null>(null);
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>("default");
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const [pushSupported, setPushSupported] = useState(true);
+  const [registration, setRegistration] = useState<ServiceWorkerRegistration | null>(null);
+  const [vapidPublicKey, setVapidPublicKey] = useState("");
+  const [subscribedFlightId, setSubscribedFlightId] = useState<string | null>(null);
 
   const STATUS_COLORS = {
     "ON_TIME": "bg-green-100 text-green-800 border-green-300",
@@ -53,6 +62,10 @@ const FlightStatusTracker: React.FC = () => {
       
       setStatus(data);
       setLastStatus(data.status);
+
+      if (notificationsEnabled && notificationPermission === "granted") {
+        await subscribeForFlight(data.flightId);
+      }
     } catch (err: any) {
       setError(err.response?.data?.message || "Flight not found");
       setStatus(null);
@@ -86,9 +99,109 @@ const FlightStatusTracker: React.FC = () => {
     }
   };
 
+  useEffect(() => {
+    initializeNotifications();
+  }, []);
+
+  const initializeNotifications = async () => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const supported = "Notification" in window && "serviceWorker" in navigator && "PushManager" in window;
+    if (!supported) {
+      setPushSupported(false);
+      return;
+    }
+
+    try {
+      const permission = await Notification.requestPermission();
+      setNotificationPermission(permission);
+
+      if (permission !== "granted") {
+        setNotificationsEnabled(false);
+        return;
+      }
+
+      const swRegistration = await navigator.serviceWorker.register("/sw.js");
+      setRegistration(swRegistration);
+      setNotificationsEnabled(true);
+
+      const key = await getVapidPublicKey();
+      if (key) {
+        setVapidPublicKey(key);
+      }
+    } catch (notificationError) {
+      console.error("Failed to initialize push notifications", notificationError);
+      setNotificationsEnabled(false);
+    }
+  };
+
+  const urlBase64ToUint8Array = (base64String: string) => {
+    const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+    const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+    const rawData = window.atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; ++i) {
+      outputArray[i] = rawData.charCodeAt(i);
+    }
+    return outputArray;
+  };
+
+  const subscribeForFlight = async (flightId: string) => {
+    if (!registration || notificationPermission !== "granted" || !vapidPublicKey) {
+      return;
+    }
+
+    if (subscribedFlightId === flightId) {
+      return;
+    }
+
+    const existingSubscription = await registration.pushManager.getSubscription();
+    const subscription = existingSubscription || await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
+    });
+
+    const subscriptionJson = subscription.toJSON();
+    await subscribeToFlightStatus({
+      flightId,
+      endpoint: subscriptionJson.endpoint,
+      keys: {
+        p256dh: subscriptionJson.keys?.p256dh,
+        auth: subscriptionJson.keys?.auth,
+      },
+    });
+    setSubscribedFlightId(flightId);
+  };
+
+  const toggleNotifications = async () => {
+    if (!pushSupported) {
+      return;
+    }
+
+    if (!notificationsEnabled) {
+      await initializeNotifications();
+      if (status) {
+        await subscribeForFlight(status.flightId);
+      }
+      return;
+    }
+
+    if (registration) {
+      const existingSubscription = await registration.pushManager.getSubscription();
+      if (existingSubscription) {
+        await existingSubscription.unsubscribe();
+      }
+    }
+
+    setNotificationsEnabled(false);
+    setSubscribedFlightId(null);
+  };
+
   return (
     <div className="max-w-2xl mx-auto p-4">
-      <div className="flex gap-2 mb-6">
+      <div className="flex gap-2 mb-6 items-end">
         <div className="flex-1">
           <Label htmlFor="flightNumber">Flight Number</Label>
           <Input
@@ -102,7 +215,21 @@ const FlightStatusTracker: React.FC = () => {
         <Button onClick={handleSearch} className="mt-6" disabled={loading}>
           {loading ? "Searching..." : "Track"}
         </Button>
+        <Button
+          type="button"
+          variant="outline"
+          className="mt-6"
+          onClick={toggleNotifications}
+          disabled={!pushSupported}
+          title={notificationsEnabled ? "Disable flight push notifications" : "Enable flight push notifications"}
+        >
+          {notificationsEnabled ? <Bell className="w-4 h-4" /> : <BellOff className="w-4 h-4" />}
+        </Button>
       </div>
+
+      <p className="text-xs text-gray-500 mb-4">
+        Notifications: {pushSupported ? (notificationPermission === "granted" && notificationsEnabled ? "Enabled" : "Disabled") : "Not supported in this browser"}
+      </p>
 
       {error && <p className="text-red-500 mb-4">{error}</p>}
 
@@ -141,6 +268,14 @@ const FlightStatusTracker: React.FC = () => {
                   <span className="text-gray-500">Estimated Departure</span>
                   <span className="font-semibold">
                     {new Date(status.estimatedDeparture).toLocaleString()}
+                  </span>
+                </div>
+              )}
+              {status.estimatedArrival && (
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Estimated Arrival</span>
+                  <span className="font-semibold">
+                    {new Date(status.estimatedArrival).toLocaleString()}
                   </span>
                 </div>
               )}

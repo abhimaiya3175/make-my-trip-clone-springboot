@@ -1,5 +1,6 @@
 package com.makemytrip.modules.auth.service;
 
+import com.makemytrip.modules.auth.exception.EmailAlreadyRegisteredException;
 import com.makemytrip.modules.auth.model.User;
 import com.makemytrip.modules.auth.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -7,7 +8,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 @Service
-@SuppressWarnings("null")
 public class AuthService {
     @Autowired
     private UserRepository userRepository;
@@ -15,8 +15,25 @@ public class AuthService {
     private PasswordEncoder passwordEncoder;
 
     public User login(String email, String password) {
+        if (email == null || password == null) {
+            return null;
+        }
         User user = userRepository.findByEmail(email);
-        if (user != null && passwordEncoder.matches(password, user.getPassword())) {
+        if (user == null || user.getPassword() == null) {
+            return null;
+        }
+
+        try {
+            if (passwordEncoder.matches(password, user.getPassword())) {
+                return user;
+            }
+        } catch (IllegalArgumentException ignored) {
+            // Handle legacy records that may still store plaintext passwords.
+        }
+
+        if (password.equals(user.getPassword())) {
+            user.setPassword(passwordEncoder.encode(password));
+            userRepository.save(user);
             return user;
         }
         return null;
@@ -24,7 +41,7 @@ public class AuthService {
 
     public User signup(User user) {
         if (userRepository.findByEmail(user.getEmail()) != null) {
-            throw new RuntimeException("Email is already registered");
+            throw new EmailAlreadyRegisteredException();
         }
         user.setPassword(passwordEncoder.encode(user.getPassword()));
         if (user.getRole() == null) {
@@ -35,6 +52,10 @@ public class AuthService {
 
     public User getUserByEmail(String email) {
         return userRepository.findByEmail(email);
+    }
+
+    public User getUserById(String id) {
+        return userRepository.findById(id).orElse(null);
     }
 
     public User editprofile(String id, User updatedUser) {

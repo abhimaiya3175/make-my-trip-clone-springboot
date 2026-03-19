@@ -1,13 +1,17 @@
 package com.makemytrip.modules.flightstatus.controller;
 
 import com.makemytrip.modules.flightstatus.dto.FlightStatusResponse;
+import com.makemytrip.modules.flightstatus.dto.PushSubscriptionRequest;
 import com.makemytrip.modules.flightstatus.dto.TimelineResponse;
 import com.makemytrip.modules.flightstatus.service.FlightStatusService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/flight-status")
@@ -43,6 +47,17 @@ public class FlightStatusController {
     ) {
         Page<FlightStatusResponse> response = service.listAll(PageRequest.of(page, size));
         return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/subscribe")
+    public ResponseEntity<Map<String, String>> subscribe(@Valid @RequestBody PushSubscriptionRequest request) {
+        service.savePushSubscription(request);
+        return ResponseEntity.ok(Map.of("message", "Subscription saved"));
+    }
+
+    @GetMapping("/vapid-public-key")
+    public ResponseEntity<Map<String, String>> getVapidPublicKey() {
+        return ResponseEntity.ok(Map.of("publicKey", service.getVapidPublicKey()));
     }
     
     // Simple error response class

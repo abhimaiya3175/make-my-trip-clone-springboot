@@ -1,5 +1,15 @@
 import api, { unwrapApiResponse } from "@/utils/api";
 
+const requireAuthToken = () => {
+  if (typeof window === "undefined" || !localStorage) {
+    return;
+  }
+  const token = localStorage.getItem("authToken");
+  if (!token) {
+    throw new Error("Authentication required. Please login again.");
+  }
+};
+
 // ========== Legacy Booking Endpoints ==========
 
 export const handleflightbooking = async (userId, flightId, seats, price, date) => {
@@ -37,11 +47,8 @@ export const handlehotelbooking = async (userId, hotelId, rooms, price, date) =>
  */
 export const getUserBookings = async (userId) => {
   try {
-    const res = await api.get(`/api/bookings`, {
-      headers: {
-        'X-User-ID': userId
-      }
-    });
+    requireAuthToken();
+    const res = await api.get(`/api/bookings`);
     return unwrapApiResponse(res);
   } catch (error) {
     console.error('Get user bookings error:', error);
@@ -54,6 +61,7 @@ export const getUserBookings = async (userId) => {
  */
 export const getBookingById = async (bookingId) => {
   try {
+    requireAuthToken();
     const res = await api.get(`/api/bookings/${bookingId}`);
     return unwrapApiResponse(res);
   } catch (error) {
@@ -82,15 +90,8 @@ export const getBookingPermissions = async (bookingId) => {
  */
 export const cancelBooking = async (bookingId, userId, reason) => {
   try {
-    const res = await api.post(
-      `/api/bookings/${bookingId}/cancel`,
-      { reason },
-      {
-        headers: {
-          'X-User-ID': userId
-        }
-      }
-    );
+    requireAuthToken();
+    const res = await api.post(`/api/bookings/${bookingId}/cancel`, { reason });
     return unwrapApiResponse(res);
   } catch (error) {
     console.error('Cancel booking error:', error);
@@ -104,15 +105,8 @@ export const cancelBooking = async (bookingId, userId, reason) => {
  */
 export const markReviewSubmitted = async (bookingId, userId) => {
   try {
-    const res = await api.post(
-      `/api/bookings/${bookingId}/review-submitted`,
-      {},
-      {
-        headers: {
-          'X-User-ID': userId
-        }
-      }
-    );
+    requireAuthToken();
+    const res = await api.post(`/api/bookings/${bookingId}/review-submitted`, {});
     return unwrapApiResponse(res);
   } catch (error) {
     console.error('Mark review submitted error:', error);
@@ -138,15 +132,8 @@ export const confirmPayment = async (bookingId) => {
  */
 export const createBooking = async (bookingData) => {
   try {
-    const res = await api.post(
-      `/api/bookings`,
-      bookingData,
-      {
-        headers: {
-          'X-User-ID': bookingData.userId
-        }
-      }
-    );
+    requireAuthToken();
+    const res = await api.post(`/api/bookings`, bookingData);
     return unwrapApiResponse(res);
   } catch (error) {
     console.error('Create booking error:', error);

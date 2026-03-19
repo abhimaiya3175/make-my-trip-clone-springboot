@@ -23,6 +23,13 @@ const CancellationsPage = () => {
   const [error, setError] = useState("");
 
   const fetchCancellations = async () => {
+    const hasAuthToken = typeof window !== "undefined" && !!localStorage.getItem("authToken");
+    if (!hasAuthToken) {
+      setLoading(false);
+      setError("Your session has expired. Please login again.");
+      return;
+    }
+
     if (!user?.id) {
       setLoading(false);
       return;

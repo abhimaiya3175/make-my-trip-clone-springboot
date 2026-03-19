@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Button } from "../ui/button";
+import { X, ChevronLeft, ChevronRight, Eye } from "lucide-react";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
 
@@ -14,6 +15,7 @@ interface RoomResponse {
   maxOccupancy: number;
   amenities: string[];
   images: string[];
+  isPanorama: boolean;
   locked: boolean;
   lockedByMe: boolean;
 }
@@ -39,6 +41,9 @@ const RoomGrid: React.FC<RoomGridProps> = ({ hotelId, userId, onRoomSelect, onRo
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [previewRoom, setPreviewRoom] = useState<RoomResponse | null>(null);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+
   const fetchRooms = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -60,6 +65,57 @@ const RoomGrid: React.FC<RoomGridProps> = ({ hotelId, userId, onRoomSelect, onRo
   useEffect(() => {
     if (hotelId) fetchRooms();
   }, [hotelId, fetchRooms]);
+
+  const openPreview = (e: React.MouseEvent, room: RoomResponse) => {
+    e.stopPropagation();
+    setPreviewRoom(room);
+    setCurrentImageIndex(0);
+  };
+
+  const nextImage = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (previewRoom) {
+      setCurrentImageIndex((prev) => (prev + 1) % previewRoom.images.length);
+    }
+  };
+
+  const prevImage = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (previewRoom) {
+      setCurrentImageIndex((prev) => (prev - 1 + previewRoom.images.length) % previewRoom.images.length);
+    }
+  };
+
+  useEffect(() => {
+    if (previewRoom?.isPanorama && previewRoom.images.length > 0) {
+      const script = document.createElement("script");
+      script.src = "https://cdn.jsdelivr.net/npm/pannellum/build/pannellum.js";
+      script.async = true;
+      
+      const link = document.createElement("link");
+      link.rel = "stylesheet";
+      link.href = "https://cdn.jsdelivr.net/npm/pannellum/build/pannellum.css";
+
+      script.onload = () => {
+        if ((window as any).pannellum) {
+          (window as any).pannellum.viewer("panorama-container", {
+            type: "equirectangular",
+            panorama: previewRoom.images[0],
+            autoLoad: true,
+            showFullscreenCtrl: false,
+          });
+        }
+      };
+
+      document.body.appendChild(script);
+      document.head.appendChild(link);
+
+      return () => {
+        if (document.body.contains(script)) document.body.removeChild(script);
+        if (document.head.contains(link)) document.head.removeChild(link);
+      };
+    }
+  }, [previewRoom]);
 
   const handleSelect = async (room: RoomResponse) => {
     if (!room.available || (room.locked && !room.lockedByMe)) return;
@@ -174,11 +230,15 @@ const RoomGrid: React.FC<RoomGridProps> = ({ hotelId, userId, onRoomSelect, onRo
                   </h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                     {typeRooms.map((room) => (
-                      <button
+                      <div
                         key={room.id}
-                        onClick={() => handleSelect(room)}
-                        disabled={!room.available || (room.locked && !room.lockedByMe) || actionLoading}
-                        className={`p-3 rounded-lg text-left transition-all ${getRoomCardStyle(room)}`}
+                        role="button"
+                        onClick={() => {
+                          if (!(!room.available || (room.locked && !room.lockedByMe) || actionLoading)) {
+                            handleSelect(room);
+                          }
+                        }}
+                        className={`p-3 rounded-lg text-left transition-all focus:outline-none ${!room.available || (room.locked && !room.lockedByMe) || actionLoading ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:ring-2 hover:ring-blue-300'} ${getRoomCardStyle(room)}`}
                       >
                         <div className="flex justify-between items-start">
                           <span className="font-medium">Room {room.roomNumber}</span>
@@ -198,7 +258,19 @@ const RoomGrid: React.FC<RoomGridProps> = ({ hotelId, userId, onRoomSelect, onRo
                             )}
                           </div>
                         )}
-                      </button>
+                        
+                        {room.images && room.images.length > 0 && (
+                          <div className="mt-3">
+                            <Button 
+                              type="button"
+                              className="w-full text-xs flex items-center justify-center gap-1 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300" 
+                              onClick={(e) => openPreview(e, room)}
+                            >
+                              <Eye className="w-3 h-3" /> Preview Room
+                            </Button>
+                          </div>
+                        )}
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -231,6 +303,70 @@ const RoomGrid: React.FC<RoomGridProps> = ({ hotelId, userId, onRoomSelect, onRo
           <p className="text-gray-500 text-center">No rooms available for this hotel</p>
         )}
       </CardContent>
+
+      {/* Preview Modal */}
+      {previewRoom && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setPreviewRoom(null)}>
+          <div className="relative w-full max-w-4xl bg-white rounded-lg shadow-xl overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center p-4 border-b">
+              <h3 className="text-xl font-bold">
+                Room {previewRoom.roomNumber} - {ROOM_TYPE_CONFIG[previewRoom.roomType]?.label}
+              </h3>
+              <button type="button" onClick={() => setPreviewRoom(null)} className="p-1 hover:bg-gray-100 rounded-full">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            
+            <div className="p-4 bg-gray-50">
+              {previewRoom.isPanorama ? (
+                <div id="panorama-container" className="w-full h-[500px] bg-gray-200 rounded-md overflow-hidden"></div>
+              ) : (
+                <div className="relative w-full h-[500px] bg-black flex items-center justify-center rounded-md overflow-hidden shadow-inner">
+                  {previewRoom.images.length > 0 && (
+                    <img 
+                      src={previewRoom.images[currentImageIndex]} 
+                      alt="Room preview" 
+                      className="max-w-full max-h-full object-contain"
+                    />
+                  )}
+                  
+                  {previewRoom.images.length > 1 && (
+                    <>
+                      <button 
+                        type="button"
+                        onClick={prevImage}
+                        className="absolute left-4 top-1/2 -translate-y-1/2 p-2 bg-white/50 hover:bg-white rounded-full shadow-md transition-colors"
+                      >
+                        <ChevronLeft className="w-6 h-6" />
+                      </button>
+                      <button 
+                        type="button"
+                        onClick={nextImage}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 p-2 bg-white/50 hover:bg-white rounded-full shadow-md transition-colors"
+                      >
+                        <ChevronRight className="w-6 h-6" />
+                      </button>
+                      
+                      <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-2 px-4">
+                        {previewRoom.images.map((img, i) => (
+                          <button
+                            type="button"
+                            key={i}
+                            onClick={(e) => { e.stopPropagation(); setCurrentImageIndex(i); }}
+                            className={`w-16 h-12 rounded border-2 overflow-hidden ${i === currentImageIndex ? 'border-primary ring-2 ring-white shadow-lg' : 'border-transparent opacity-60 hover:opacity-100'}`}
+                          >
+                            <img src={img} alt={`Thumb ${i}`} className="w-full h-full object-cover" />
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </Card>
   );
 };

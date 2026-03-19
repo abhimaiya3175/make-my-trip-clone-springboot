@@ -14,3 +14,14 @@ export const listFlightStatuses = async (page = 0, size = 10) => {
   const response = await api.get(`/api/flight-status?page=${page}&size=${size}`);
   return unwrapApiResponse(response.data);
 };
+
+export const getVapidPublicKey = async () => {
+  const response = await api.get(`/api/flight-status/vapid-public-key`);
+  const payload = unwrapApiResponse(response.data);
+  return payload?.publicKey;
+};
+
+export const subscribeToFlightStatus = async (subscription) => {
+  const response = await api.post(`/api/flight-status/subscribe`, subscription);
+  return unwrapApiResponse(response.data);
+};
