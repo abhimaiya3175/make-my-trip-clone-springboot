@@ -5,6 +5,17 @@ import { X, ChevronLeft, ChevronRight, Eye } from "lucide-react";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
 
+const buildAuthHeaders = () => {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (typeof window !== "undefined") {
+    const token = localStorage.getItem("authToken");
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+  }
+  return headers;
+};
+
 interface RoomResponse {
   id: string;
   hotelId: string;
@@ -136,7 +147,7 @@ const RoomGrid: React.FC<RoomGridProps> = ({ hotelId, userId, onRoomSelect, onRo
     try {
       const res = await fetch(`${API_BASE}/api/seatroom/rooms/${room.id}/lock`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: buildAuthHeaders(),
         body: JSON.stringify({ userId }),
       });
       const json = await res.json();
@@ -145,7 +156,11 @@ const RoomGrid: React.FC<RoomGridProps> = ({ hotelId, userId, onRoomSelect, onRo
         onRoomSelect?.(json.data);
         await fetchRooms();
       } else {
-        setError(json.error?.message || "Failed to lock room");
+        if (res.status === 401) {
+          setError("Please log in again to lock rooms.");
+        } else {
+          setError(json.error?.message || "Failed to lock room");
+        }
       }
     } catch (err) {
       setError("Failed to lock room");
@@ -159,7 +174,7 @@ const RoomGrid: React.FC<RoomGridProps> = ({ hotelId, userId, onRoomSelect, onRo
     try {
       await fetch(`${API_BASE}/api/seatroom/rooms/${roomId}/release`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: buildAuthHeaders(),
         body: JSON.stringify({ userId }),
       });
     } catch (err) {
@@ -174,7 +189,7 @@ const RoomGrid: React.FC<RoomGridProps> = ({ hotelId, userId, onRoomSelect, onRo
     try {
       const res = await fetch(`${API_BASE}/api/seatroom/rooms/${selectedRoomId}/confirm`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: buildAuthHeaders(),
         body: JSON.stringify({ userId }),
       });
       const json = await res.json();
@@ -183,7 +198,11 @@ const RoomGrid: React.FC<RoomGridProps> = ({ hotelId, userId, onRoomSelect, onRo
         setSelectedRoomId(null);
         await fetchRooms();
       } else {
-        setError(json.error?.message || "Failed to confirm room");
+        if (res.status === 401) {
+          setError("Please log in again to confirm rooms.");
+        } else {
+          setError(json.error?.message || "Failed to confirm room");
+        }
       }
     } catch (err) {
       setError("Failed to confirm room booking");

@@ -249,8 +249,9 @@ public class BookingController {
             @RequestParam String flightId, 
             @RequestParam int seats, 
             @RequestParam double price, 
-            @RequestParam(required = false) String date) {
-        return bookingService.bookFlight(userId, flightId, seats, price, date);
+            @RequestParam(required = false) String date,
+            @RequestParam(required = false) String seatNumbers) {
+        return bookingService.bookFlight(userId, flightId, seats, price, date, seatNumbers);
     }
 
     @PostMapping("/hotel")

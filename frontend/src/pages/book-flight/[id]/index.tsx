@@ -28,6 +28,14 @@ interface Flight {
   price: number; // Price of the flight
   availableSeats: number; // Number of available seats
 }
+
+interface SelectedSeatInfo {
+  id: string;
+  seatNumber: string;
+  seatClass: "ECONOMY" | "BUSINESS" | "FIRST";
+  effectivePrice: number;
+}
+
 import {
   Dialog,
   DialogContent,
@@ -53,12 +61,16 @@ const BookFlightPage = () => {
   const [loading, setLoading] = useState(true);
   const [quantity, setQuantity] = useState(1);
   const [open, setopem] = useState(false);
+  const [selectedSeats, setSelectedSeats] = useState<SelectedSeatInfo[]>([]);
+  const [showSeatSelector, setShowSeatSelector] = useState(true);
   const user = useSelector((state: any) => state.user.user);
   const dispatch = useDispatch();
   useEffect(() => {
     const fetchFlight = async () => {
       if (!id) return;
       try {
+        setSelectedSeats([]);
+        setShowSeatSelector(true);
         const data = await getFlightById(id as string);
         if (data) {
           setFlights([data]);
@@ -178,17 +190,29 @@ const BookFlightPage = () => {
   const handleQuantityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     e.preventDefault();
     const value = Number.parseInt(e.target.value);
-    setQuantity(
-      isNaN(value) ? 1 : Math.max(1, Math.min(value, flight.availableSeats))
-    );
+    const newQuantity = isNaN(value) ? 1 : Math.max(1, Math.min(value, flight.availableSeats));
+    
+    // If quantity increased, add to seat selection; if decreased, remove extra seats
+    if (newQuantity < quantity) {
+      // Remove seats that are now beyond the new quantity
+      setSelectedSeats(selectedSeats.slice(0, newQuantity));
+    }
+    
+    setQuantity(newQuantity);
+    
+    // Show seat selector if new quantity > selected seats
+    if (newQuantity > selectedSeats.length) {
+      setShowSeatSelector(true);
+    }
   };
 
   const totalPrice = (flight?.price || 0) * quantity;
   const totalTaxes = (fareSummary?.taxes || 0) * quantity;
   const totalOtherServices = (fareSummary?.otherServices || 0) * quantity;
   const totalDiscounts = (fareSummary?.discounts || 0) * quantity;
+  const totalSeatCharges = selectedSeats.reduce((sum, seat) => sum + seat.effectivePrice, 0);
   const grandTotal =
-    totalPrice + totalTaxes + totalOtherServices - totalDiscounts;
+    totalPrice + totalTaxes + totalOtherServices + totalSeatCharges - totalDiscounts;
 
   const handlebooking = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -202,7 +226,8 @@ const BookFlightPage = () => {
         flight?.id,
         quantity,
         grandTotal,
-        travelDate
+        travelDate,
+        selectedSeats.map((seat) => seat.seatNumber)
       );
       const updateuser = {
         ...user,
@@ -211,6 +236,8 @@ const BookFlightPage = () => {
       dispatch(setUser(updateuser));
       setopem(false);
       setQuantity(1);
+      setSelectedSeats([]);
+      setShowSeatSelector(true);
       const bookingId = data?.id || data?._id;
       if (bookingId) {
         router.push(`/booking/confirmation?bookingId=${encodeURIComponent(bookingId)}&type=flight`);
@@ -221,8 +248,14 @@ const BookFlightPage = () => {
       console.log(error);
     }
   };
+
+  const handleSeatConfirmed = (seats: SelectedSeatInfo[]) => {
+    setSelectedSeats(seats);
+    setShowSeatSelector(false);
+  };
+
   const BookingContent = () => (
-    <DialogContent className="sm:max-w-[600px] bg-white">
+    <DialogContent className="sm:max-w-[600px] bg-white max-h-[90vh] overflow-y-auto">
       <DialogHeader>
         <DialogTitle className="text-2xl font-bold flex items-center">
           <Plane className="w-6 h-6 mr-2" />
@@ -289,8 +322,41 @@ const BookFlightPage = () => {
             />
           </div>
           <div className="md:col-span-2 mt-4 bg-gray-50 p-4 rounded-xl border">
-            <h3 className="font-semibold text-gray-800 mb-2">Select Your Seats</h3>
-            <SeatMap flightId={flight?.id as string} userId={user?.id as string} />
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="font-semibold text-gray-800">Select Your Seats ({selectedSeats.length}/{quantity})</h3>
+              {selectedSeats.length === quantity && !showSeatSelector && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowSeatSelector(true)}
+                >
+                  Change Seats
+                </Button>
+              )}
+            </div>
+
+            {selectedSeats.length === quantity && !showSeatSelector ? (
+              <div className="space-y-2">
+                {selectedSeats.map((seat) => (
+                  <div key={seat.id} className="rounded-lg border border-green-200 bg-green-50 p-3 text-sm">
+                    <p className="font-medium text-green-800">
+                      Seat confirmed: {seat.seatNumber} ({seat.seatClass})
+                    </p>
+                    <p className="text-green-700 mt-1">
+                      Seat charge: ₹ {seat.effectivePrice.toLocaleString()}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <SeatMap
+                flightId={flight?.id as string}
+                userId={user?.id as string}
+                requiredSeats={quantity}
+                onSeatConfirm={handleSeatConfirmed}
+              />
+            )}
           </div>
         </div>
         <div className="bg-gray-100 rounded-lg p-4">
@@ -323,6 +389,18 @@ const BookFlightPage = () => {
                 - ₹ {Math.abs(totalDiscounts).toLocaleString()}
               </span>
             </div>
+            {selectedSeats.length > 0 && (
+              <>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-600">Seat Charges</span>
+                  <span className="font-medium">₹ {totalSeatCharges.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-600">Seats Selected</span>
+                  <span className="font-medium">{selectedSeats.map(s => s.seatNumber).join(", ")}</span>
+                </div>
+              </>
+            )}
             <div className="border-t pt-2 mt-2">
               <div className="flex justify-between items-center">
                 <span className="font-bold text-lg">Total Amount</span>
@@ -575,6 +653,18 @@ const BookFlightPage = () => {
                     - ₹ {Math.abs(totalDiscounts).toLocaleString()}
                   </span>
                 </div>
+                {selectedSeats.length > 0 && (
+                  <>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-600">Seat Charges</span>
+                      <span className="font-medium">₹ {totalSeatCharges.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-600">Seats Selected</span>
+                      <span className="font-medium">{selectedSeats.map(s => s.seatNumber).join(", ")}</span>
+                    </div>
+                  </>
+                )}
                 <div className="border-t pt-2 mt-2">
                   <div className="flex justify-between items-center">
                     <span className="font-bold text-lg">Total Amount</span>

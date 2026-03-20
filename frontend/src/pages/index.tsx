@@ -36,11 +36,39 @@ import { useDispatch, useSelector } from "react-redux";
 import { clearUser } from "@/store";
 import Link from "next/link";
 
+const getTodayLocalISODate = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const toLocalISODate = (dateValue?: string) => {
+  if (!dateValue) {
+    return "";
+  }
+
+  if (dateValue.length >= 10 && /^\d{4}-\d{2}-\d{2}/.test(dateValue)) {
+    return dateValue.substring(0, 10);
+  }
+
+  const parsedDate = new Date(dateValue);
+  if (Number.isNaN(parsedDate.getTime())) {
+    return "";
+  }
+
+  const year = parsedDate.getFullYear();
+  const month = String(parsedDate.getMonth() + 1).padStart(2, "0");
+  const day = String(parsedDate.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
 export default function Home() {
   const [bookingtype, setbookingtype] = useState("flights");
   const [from, setfrom] = useState("");
   const [to, setto] = useState("");
-  const [date, setdate] = useState("");
+  const [date, setdate] = useState(getTodayLocalISODate());
   const [travelers, settravelers] = useState(1);
   const [searchresults, setsearchresult] = useState<any[]>([]);
   const [hotel, sethotel] = useState<any[]>([]);
@@ -49,6 +77,7 @@ export default function Home() {
   const user = useSelector((state: any) => state.user.user);
   const router = useRouter();
   const dispatch = useDispatch();
+  const minSelectableDate = useMemo(() => getTodayLocalISODate(), []);
 
   const logout = () => {
     dispatch(clearUser());
@@ -175,11 +204,18 @@ export default function Home() {
   }
   const handlesearch = () => {
     if (bookingtype === "flights") {
-      const results = flight.filter(
+      const routeMatches = flight.filter(
         (FLIGHT) =>
           FLIGHT.from.toLowerCase() === from.toLowerCase() &&
           FLIGHT.to.toLowerCase() === to.toLowerCase()
       );
+
+      const dateMatches = date
+        ? routeMatches.filter((flightItem) => toLocalISODate(flightItem.departureTime) === date)
+        : routeMatches;
+
+      // Keep search usable across all dates: prefer selected-date flights, fallback to all route flights.
+      const results = dateMatches.length > 0 ? dateMatches : routeMatches;
       setsearchresult(results);
     } else if (bookingtype === "hotels") {
       const results = hotel.filter(
@@ -342,6 +378,7 @@ export default function Home() {
                 }
                 subtitle="Select a date"
                 type="date"
+                min={minSelectableDate}
               />
             </div>
 
@@ -575,6 +612,7 @@ function SearchInput({
   onChange,
   subtitle,
   type = "text",
+  min,
 }: any) {
   return (
     <div className="border rounded-lg p-3 hover:border-blue-500 cursor-pointer h-full">
@@ -586,6 +624,7 @@ function SearchInput({
             type={type}
             value={value}
             onChange={onChange}
+            min={min}
             className="font-semibold w-full bg-transparent outline-none"
             placeholder={placeholder}
           />

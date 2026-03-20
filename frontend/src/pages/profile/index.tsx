@@ -322,13 +322,18 @@ const index = () => {
               <h2 className="text-2xl font-bold mb-6">My Bookings</h2>
               <div className="space-y-6">
                 {(bookings.length > 0 ? bookings : user?.bookings || []).map((booking: any, index: any) => (
+                  (() => {
+                    const normalizedType = String(booking?.type || booking?.entityType || "").toUpperCase();
+                    const isFlightBooking = normalizedType === "FLIGHT";
+                    const displayType = isFlightBooking ? "Flight" : "Hotel";
+                    return (
                   <div
                     key={index}
                     className="border rounded-lg p-4 hover:shadow-md transition-shadow"
                   >
                     <div className="flex items-start justify-between mb-4">
                       <div className="flex items-center space-x-3">
-                        {booking?.type === "Flight" ? (
+                        {isFlightBooking ? (
                           <div className="bg-blue-100 p-2 rounded-lg">
                             <Plane className="w-6 h-6 text-blue-600" />
                           </div>
@@ -338,7 +343,7 @@ const index = () => {
                           </div>
                         )}
                         <div>
-                          <h3 className="font-semibold">{booking?.type}</h3>
+                          <h3 className="font-semibold">{displayType}</h3>
                           <p className="text-sm text-gray-500">
                             Booking ID: {booking?.id || booking?.bookingId}
                           </p>
@@ -348,7 +353,7 @@ const index = () => {
                         <p className="font-semibold">
                           ₹ {booking?.totalPrice.toLocaleString("en-IN")}
                         </p>
-                        <p className="text-sm text-gray-500">{booking?.type}</p>
+                        <p className="text-sm text-gray-500">{displayType}</p>
                       </div>
                     </div>
                     <div className="flex flex-wrap gap-4 text-sm text-gray-600">
@@ -358,13 +363,19 @@ const index = () => {
                       </div>
                       <div className="flex items-center space-x-1">
                         <MapPin className="w-4 h-4" />
-                        <span>{booking?.type}</span>
+                        <span>{displayType}</span>
                       </div>
                       <div className="flex items-center space-x-1">
                         <CreditCard className="w-4 h-4" />
                         <span>Paid</span>
                       </div>
                     </div>
+
+                    {isFlightBooking && Array.isArray(booking?.seatNumbers) && booking.seatNumbers.length > 0 && (
+                      <div className="mt-3 text-sm text-gray-700">
+                        <span className="font-medium">Seat Number:</span> {booking.seatNumbers.join(", ")}
+                      </div>
+                    )}
 
                     {/* Cancel & Refund section */}
                     {isBookingCancelled(booking?.id || booking?.bookingId) ? (
@@ -392,6 +403,8 @@ const index = () => {
                       </div>
                     )}
                   </div>
+                    );
+                  })()
                 ))}
               </div>
 

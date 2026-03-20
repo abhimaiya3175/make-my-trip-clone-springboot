@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
 import BookingSummary from "@/components/booking/BookingSummary";
-import Navbar from "@/components/Navbar";
 import { useRouter } from "next/router";
 import { getBookingById } from "@/api";
 
@@ -61,7 +60,6 @@ export default function BookingConfirmationPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navbar />
       <div className="max-w-2xl mx-auto p-6">
         <h1 className="text-2xl font-bold mb-6">Booking Confirmation</h1>
         {error ? (

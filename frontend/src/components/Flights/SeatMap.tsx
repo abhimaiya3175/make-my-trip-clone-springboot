@@ -4,6 +4,17 @@ import { Button } from "../ui/button";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
 
+const buildAuthHeaders = () => {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (typeof window !== "undefined") {
+    const token = localStorage.getItem("authToken");
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+  }
+  return headers;
+};
+
 interface SeatResponse {
   id: string;
   flightId: string;
@@ -22,13 +33,14 @@ interface SeatResponse {
 interface SeatMapProps {
   flightId: string;
   userId?: string;
-  onSeatSelect?: (seat: SeatResponse) => void;
-  onSeatConfirm?: (seat: SeatResponse) => void;
+  requiredSeats?: number;
+  onSeatSelect?: (seats: SeatResponse[]) => void;
+  onSeatConfirm?: (seats: SeatResponse[]) => void;
 }
 
-const SeatMap: React.FC<SeatMapProps> = ({ flightId, userId, onSeatSelect, onSeatConfirm }) => {
+const SeatMap: React.FC<SeatMapProps> = ({ flightId, userId, requiredSeats = 1, onSeatSelect, onSeatConfirm }) => {
   const [seats, setSeats] = useState<SeatResponse[]>([]);
-  const [selectedSeatId, setSelectedSeatId] = useState<string | null>(null);
+  const [selectedSeatIds, setSelectedSeatIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -57,38 +69,48 @@ const SeatMap: React.FC<SeatMapProps> = ({ flightId, userId, onSeatSelect, onSea
 
   const handleSelect = async (seat: SeatResponse) => {
     if (!seat.available || seat.locked) return;
-    if (!userId) {
-      setSelectedSeatId(seat.id);
-      onSeatSelect?.(seat);
-      return;
-    }
-
-    // If another seat was locked by me, release it first
-    const currentlyLocked = seats.find(s => s.lockedByMe && s.id !== seat.id);
-    if (currentlyLocked) {
-      await releaseSeat(currentlyLocked.id);
-    }
-
-    // Lock the new seat
-    setActionLoading(true);
-    try {
-      const res = await fetch(`${API_BASE}/api/seatroom/seats/${seat.id}/lock`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId }),
-      });
-      const json = await res.json();
-      if (res.ok) {
-        setSelectedSeatId(seat.id);
-        onSeatSelect?.(json.data);
-        await fetchSeats();
-      } else {
-        setError(json.error?.message || "Failed to lock seat");
+    
+    // Toggle seat selection
+    const isAlreadySelected = selectedSeatIds.includes(seat.id);
+    
+    if (isAlreadySelected) {
+      // Deselect and release
+      if (userId) {
+        await releaseSeat(seat.id);
       }
-    } catch (err) {
-      setError("Failed to lock seat");
-    } finally {
-      setActionLoading(false);
+      setSelectedSeatIds(selectedSeatIds.filter(id => id !== seat.id));
+    } else {
+      // Can we add more seats?
+      if (selectedSeatIds.length >= requiredSeats) {
+        setError(`You can only select ${requiredSeats} seat(s).`);
+        return;
+      }
+
+      // Select new seat
+      setActionLoading(true);
+      try {
+        const res = await fetch(`${API_BASE}/api/seatroom/seats/${seat.id}/lock`, {
+          method: "POST",
+          headers: buildAuthHeaders(),
+          body: JSON.stringify({ userId }),
+        });
+        const json = await res.json();
+        if (res.ok) {
+          setSelectedSeatIds([...selectedSeatIds, seat.id]);
+          onSeatSelect?.([...selectedSeatIds.map(id => seats.find(s => s.id === id)).filter(Boolean) as SeatResponse[], json.data]);
+          await fetchSeats();
+        } else {
+          if (res.status === 401) {
+            setError("Please log in again to lock seats.");
+          } else {
+            setError(json.error?.message || "Failed to lock seat");
+          }
+        }
+      } catch (err) {
+        setError("Failed to lock seat");
+      } finally {
+        setActionLoading(false);
+      }
     }
   };
 
@@ -97,7 +119,7 @@ const SeatMap: React.FC<SeatMapProps> = ({ flightId, userId, onSeatSelect, onSea
     try {
       await fetch(`${API_BASE}/api/seatroom/seats/${seatId}/release`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: buildAuthHeaders(),
         body: JSON.stringify({ userId }),
       });
     } catch (err) {
@@ -106,32 +128,49 @@ const SeatMap: React.FC<SeatMapProps> = ({ flightId, userId, onSeatSelect, onSea
   };
 
   const handleConfirm = async () => {
-    if (!selectedSeatId || !userId) return;
+    if (selectedSeatIds.length === 0 || selectedSeatIds.length !== requiredSeats || !userId) return;
+    
     setActionLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${API_BASE}/api/seatroom/seats/${selectedSeatId}/confirm`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId }),
-      });
-      const json = await res.json();
-      if (res.ok) {
-        onSeatConfirm?.(json.data);
-        setSelectedSeatId(null);
+      // Confirm all selected seats
+      const confirmResponses = await Promise.all(
+        selectedSeatIds.map(seatId =>
+          fetch(`${API_BASE}/api/seatroom/seats/${seatId}/confirm`, {
+            method: "POST",
+            headers: buildAuthHeaders(),
+            body: JSON.stringify({ userId }),
+          })
+        )
+      );
+
+      const allSuccessful = confirmResponses.every(res => res.ok);
+      
+      if (allSuccessful) {
+        const confirmedSeats = selectedSeatIds
+          .map(id => seats.find(s => s.id === id))
+          .filter(Boolean) as SeatResponse[];
+        
+        onSeatConfirm?.(confirmedSeats);
+        setSelectedSeatIds([]);
         await fetchSeats();
       } else {
-        setError(json.error?.message || "Failed to confirm seat");
+        const failedResponse = confirmResponses.find(res => !res.ok);
+        if (failedResponse?.status === 401) {
+          setError("Please log in again to confirm seats.");
+        } else {
+          setError("Failed to confirm one or more seats");
+        }
       }
     } catch (err) {
-      setError("Failed to confirm seat booking");
+      setError("Failed to confirm seat bookings");
     } finally {
       setActionLoading(false);
     }
   };
 
   const getSeatColor = (seat: SeatResponse) => {
-    if (seat.lockedByMe) return "bg-blue-500 text-white ring-2 ring-blue-300";
+    if (selectedSeatIds.includes(seat.id)) return "bg-blue-500 text-white ring-2 ring-blue-300";
     if (!seat.available) return "bg-gray-400 cursor-not-allowed";
     if (seat.locked) return "bg-orange-300 cursor-not-allowed";
     switch (seat.seatClass) {
@@ -141,7 +180,11 @@ const SeatMap: React.FC<SeatMapProps> = ({ flightId, userId, onSeatSelect, onSea
     }
   };
 
-  const selectedSeat = seats.find(s => s.id === selectedSeatId);
+  const selectedSeats = selectedSeatIds
+    .map(id => seats.find(s => s.id === id))
+    .filter(Boolean) as SeatResponse[];
+  
+  const isComplete = selectedSeatIds.length === requiredSeats;
 
   if (loading) return <p className="text-center py-4">Loading seat map...</p>;
 
@@ -158,47 +201,64 @@ const SeatMap: React.FC<SeatMapProps> = ({ flightId, userId, onSeatSelect, onSea
         {seats.length > 0 ? (
           <>
             {/* Seat grid grouped by rows */}
-            <div className="grid grid-cols-6 gap-1 max-w-md mx-auto">
-              {seats.map((seat) => (
-                <button
-                  key={seat.id}
-                  onClick={() => handleSelect(seat)}
-                  className={`p-2 text-xs rounded ${getSeatColor(seat)} transition-colors`}
-                  disabled={!seat.available || (seat.locked && !seat.lockedByMe) || actionLoading}
-                  title={`${seat.seatNumber} - ${seat.seatClass} ₹${seat.effectivePrice}${seat.premiumSurcharge > 0 ? " (Premium)" : ""}${!seat.available ? " (Taken)" : seat.locked ? " (Held)" : ""}`}
-                >
-                  {seat.seatNumber}
-                </button>
-              ))}
-            </div>
+            <div className="max-h-[45vh] overflow-y-auto pr-1 rounded-md border border-gray-100 bg-white">
+              <div className="grid grid-cols-6 gap-1 max-w-md mx-auto p-2">
+                {seats.map((seat) => (
+                  <button
+                    key={seat.id}
+                    onClick={() => handleSelect(seat)}
+                    className={`p-2 text-xs rounded ${getSeatColor(seat)} transition-colors`}
+                    disabled={!seat.available || (seat.locked && !seat.lockedByMe) || actionLoading}
+                    title={`${seat.seatNumber} - ${seat.seatClass} ₹${seat.effectivePrice}${seat.premiumSurcharge > 0 ? " (Premium)" : ""}${!seat.available ? " (Taken)" : seat.locked ? " (Held)" : ""}`}
+                  >
+                    {seat.seatNumber}
+                  </button>
+                ))}
+              </div>
 
-            {/* Legend */}
-            <div className="flex flex-wrap gap-3 mt-4 text-xs justify-center">
-              <span className="flex items-center gap-1"><span className="w-3 h-3 bg-green-100 border rounded" /> Economy</span>
-              <span className="flex items-center gap-1"><span className="w-3 h-3 bg-purple-100 border rounded" /> Business</span>
-              <span className="flex items-center gap-1"><span className="w-3 h-3 bg-yellow-100 border rounded" /> First</span>
-              <span className="flex items-center gap-1"><span className="w-3 h-3 bg-gray-400 border rounded" /> Taken</span>
-              <span className="flex items-center gap-1"><span className="w-3 h-3 bg-orange-300 border rounded" /> Held</span>
-              <span className="flex items-center gap-1"><span className="w-3 h-3 bg-blue-500 border rounded" /> Selected</span>
+              {/* Sticky legend while scrolling seat grid */}
+              <div className="sticky bottom-0 border-t bg-white/95 px-2 py-2 backdrop-blur-sm">
+                <div className="flex flex-wrap gap-3 text-xs justify-center">
+                  <span className="flex items-center gap-1"><span className="w-3 h-3 bg-green-100 border rounded" /> Economy</span>
+                  <span className="flex items-center gap-1"><span className="w-3 h-3 bg-purple-100 border rounded" /> Business</span>
+                  <span className="flex items-center gap-1"><span className="w-3 h-3 bg-yellow-100 border rounded" /> First</span>
+                  <span className="flex items-center gap-1"><span className="w-3 h-3 bg-gray-400 border rounded" /> Taken</span>
+                  <span className="flex items-center gap-1"><span className="w-3 h-3 bg-orange-300 border rounded" /> Held</span>
+                  <span className="flex items-center gap-1"><span className="w-3 h-3 bg-blue-500 border rounded" /> Selected</span>
+                </div>
+              </div>
             </div>
 
             {/* Selected seat summary + confirm */}
-            {selectedSeat && (
+            {selectedSeats.length > 0 && (
               <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <p className="font-semibold">{selectedSeat.seatNumber} — {selectedSeat.seatClass}</p>
-                    <p className="text-sm text-gray-600">
-                      Base: ₹{selectedSeat.basePrice}
-                      {selectedSeat.premiumSurcharge > 0 && (
-                        <span className="text-amber-600"> + ₹{selectedSeat.premiumSurcharge} premium</span>
-                      )}
+                <div className="flex justify-between items-start">
+                  <div className="flex-1">
+                    <p className="font-semibold mb-2">
+                      Selected Seats ({selectedSeats.length}/{requiredSeats})
                     </p>
-                    <p className="font-bold text-lg">₹{selectedSeat.effectivePrice}</p>
+                    <div className="space-y-2">
+                      {selectedSeats.map((seat) => (
+                        <div key={seat.id} className="flex justify-between text-sm">
+                          <span>{seat.seatNumber} ({seat.seatClass})</span>
+                          <span className="font-medium">₹{seat.effectivePrice}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="border-t mt-2 pt-2 font-bold">
+                      <div className="flex justify-between">
+                        <span>Total Seat Charges:</span>
+                        <span>₹{selectedSeats.reduce((sum, s) => sum + s.effectivePrice, 0)}</span>
+                      </div>
+                    </div>
                   </div>
                   {userId && (
-                    <Button onClick={handleConfirm} disabled={actionLoading}>
-                      {actionLoading ? "Confirming..." : "Confirm Seat"}
+                    <Button 
+                      onClick={handleConfirm} 
+                      disabled={actionLoading || !isComplete}
+                      className="ml-4 flex-shrink-0"
+                    >
+                      {actionLoading ? "Confirming..." : isComplete ? "Confirm Seats" : `${requiredSeats - selectedSeats.length} more`}
                     </Button>
                   )}
                 </div>

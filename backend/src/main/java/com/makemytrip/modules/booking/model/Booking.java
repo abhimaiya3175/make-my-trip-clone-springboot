@@ -6,6 +6,7 @@ import org.springframework.data.mongodb.core.index.Indexed;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Document(collection = "bookings")
 public class Booking {
@@ -24,6 +25,7 @@ public class Booking {
     private EntityType entityType; // FLIGHT or HOTEL
     
     private int quantity; // number of seats or rooms
+    private List<String> seatNumbers; // selected flight seats (if applicable)
     private double totalPrice;
     
     // Date fields
@@ -110,6 +112,14 @@ public class Booking {
 
     public void setQuantity(int quantity) {
         this.quantity = quantity;
+    }
+
+    public List<String> getSeatNumbers() {
+        return seatNumbers;
+    }
+
+    public void setSeatNumbers(List<String> seatNumbers) {
+        this.seatNumbers = seatNumbers;
     }
 
     public double getTotalPrice() {

@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import RecommendationCard from "./RecommendationCard";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
+import api from "@/utils/api";
 
 interface Recommendation {
   id: string;
@@ -33,12 +32,9 @@ const RecommendationsSection: React.FC<RecommendationsSectionProps> = ({
     setLoading(true);
     setError(null);
     try {
-      const params = itemType ? `?itemType=${itemType}` : "";
-      const res = await fetch(
-        `${API_BASE}/api/recommendations/user/${userId}${params}`
-      );
-      const json = await res.json();
-      setRecommendations(json.data || []);
+      const params = itemType ? { itemType } : {};
+      const res = await api.get(`/api/recommendations/user/${userId}`, { params });
+      setRecommendations(res.data?.data || []);
     } catch {
       setError("Could not load recommendations.");
     } finally {

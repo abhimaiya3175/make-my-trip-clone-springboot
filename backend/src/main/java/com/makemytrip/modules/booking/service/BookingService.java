@@ -17,8 +17,10 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 @SuppressWarnings("null")
@@ -283,7 +285,7 @@ public class BookingService {
 
     // ========== Legacy Methods (for backward compatibility) ==========
 
-    public Booking bookFlight(String userId, String flightId, int seats, double price, String date) {
+    public Booking bookFlight(String userId, String flightId, int seats, double price, String date, String seatNumbers) {
         Optional<User> usersOptional = userRepository.findById(userId);
         Optional<Flight> flightOptional = flightRepository.findById(flightId);
         if (usersOptional.isPresent() && flightOptional.isPresent()) {
@@ -313,6 +315,12 @@ public class BookingService {
                 }
                 
                 booking.setQuantity(seats);
+                if (seatNumbers != null && !seatNumbers.isBlank()) {
+                    booking.setSeatNumbers(Arrays.stream(seatNumbers.split(","))
+                        .map(String::trim)
+                        .filter(s -> !s.isEmpty())
+                        .collect(Collectors.toList()));
+                }
                 booking.setTotalPrice(price);
                 booking.setBookingStatus(BookingStatus.CONFIRMED);
                 booking.setPaymentStatus(PaymentStatus.PAID);

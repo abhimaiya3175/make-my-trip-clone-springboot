@@ -12,12 +12,15 @@ const requireAuthToken = () => {
 
 // ========== Legacy Booking Endpoints ==========
 
-export const handleflightbooking = async (userId, flightId, seats, price, date) => {
+export const handleflightbooking = async (userId, flightId, seats, price, date, seatNumbers = []) => {
   try {
     let url = `/api/bookings/flight?userId=${userId}&flightId=${flightId}&seats=${seats}&price=${price}`;
     if (date) {
       const dateStr = typeof date === 'string' ? date.substring(0, 10) : date;
       url += `&date=${dateStr}`;
+    }
+    if (Array.isArray(seatNumbers) && seatNumbers.length > 0) {
+      url += `&seatNumbers=${encodeURIComponent(seatNumbers.join(","))}`;
     }
     const res = await api.post(url);
     return res.data;

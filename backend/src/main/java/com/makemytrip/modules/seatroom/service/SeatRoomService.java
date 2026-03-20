@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 import jakarta.annotation.PostConstruct;
 import java.io.IOException;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 @Slf4j
@@ -75,16 +76,89 @@ public class SeatRoomService {
     // ── Seat operations ──────────────────────────────────────────────
 
     public List<SeatResponse> getSeatsByFlightId(String flightId, String userId) {
+        ensureSeatMapForFlight(flightId);
         return seatRepository.findByFlightId(flightId).stream()
                 .map(seat -> mapSeatResponse(seat, userId))
                 .toList();
     }
 
     public List<SeatResponse> getAvailableSeats(String flightId, String userId) {
+        ensureSeatMapForFlight(flightId);
         return seatRepository.findByFlightIdAndAvailable(flightId, true).stream()
                 .filter(seat -> !seat.isLocked() || userId.equals(seat.getLockedByUserId()))
                 .map(seat -> mapSeatResponse(seat, userId))
                 .toList();
+    }
+
+    private void ensureSeatMapForFlight(String flightId) {
+        if (flightId == null || flightId.isBlank() || seatRepository.existsByFlightId(flightId)) {
+            return;
+        }
+
+        try {
+            List<Seat> generatedSeats = new ArrayList<>();
+            String[] columns = {"A", "B", "C", "D", "E", "F"};
+
+            for (int row = 1; row <= 20; row++) {
+                for (String column : columns) {
+                    generatedSeats.add(Seat.builder()
+                            .flightId(flightId)
+                            .seatNumber(row + column)
+                            .row(String.valueOf(row))
+                            .column(column)
+                            .seatClass(resolveSeatClass(row))
+                            .available(true)
+                            .basePrice(resolveBasePrice(row))
+                            .premiumSurcharge(resolveSurcharge(row, column))
+                            .lockedByUserId(null)
+                            .lockedUntil(null)
+                            .build());
+                }
+            }
+
+            seatRepository.saveAll(generatedSeats);
+            log.info("Generated {} seats for flight {}", generatedSeats.size(), flightId);
+        } catch (Exception ex) {
+            // Another request may generate seats concurrently; unique index protects integrity.
+            log.debug("Seat map generation skipped for flight {}: {}", flightId, ex.getMessage());
+        }
+    }
+
+    private SeatClass resolveSeatClass(int row) {
+        if (row <= 2) {
+            return SeatClass.FIRST;
+        }
+        if (row <= 6) {
+            return SeatClass.BUSINESS;
+        }
+        return SeatClass.ECONOMY;
+    }
+
+    private double resolveBasePrice(int row) {
+        if (row <= 2) {
+            return 4500.0;
+        }
+        if (row <= 6) {
+            return 2500.0;
+        }
+        return 800.0;
+    }
+
+    private double resolveSurcharge(int row, String column) {
+        boolean isWindow = "A".equals(column) || "F".equals(column);
+        boolean isExitRow = row == 10 || row == 11;
+
+        double surcharge = 0.0;
+        if (isWindow) {
+            surcharge += 200.0;
+        }
+        if (isExitRow) {
+            surcharge += 300.0;
+        }
+        if (row <= 3) {
+            surcharge += 250.0;
+        }
+        return surcharge;
     }
 
     /**

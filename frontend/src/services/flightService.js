@@ -2,7 +2,7 @@ import api, { unwrapApiResponse } from "@/utils/api";
 
 export const getflight = async () => {
   try {
-    const res = await api.get(`/flight`);
+    const res = await api.get(`/api/flight`);
     return unwrapApiResponse(res);
   } catch (error) {
     console.log(error);
@@ -17,7 +17,7 @@ export const getFlightById = async (id) => {
 
 export const addflight = async (flightName, from, to, departureTime, arrivalTime, price, availableSeats) => {
   try {
-    const res = await api.post(`/admin/flight`, {
+    const res = await api.post(`/api/admin/flight`, {
       flightName,
       from,
       to,
@@ -34,7 +34,7 @@ export const addflight = async (flightName, from, to, departureTime, arrivalTime
 
 export const editflight = async (id, flightName, from, to, departureTime, arrivalTime, price, availableSeats) => {
   try {
-    const res = await api.put(`/admin/flight/${id}`, {
+    const res = await api.put(`/api/admin/flight/${id}`, {
       flightName,
       from,
       to,
