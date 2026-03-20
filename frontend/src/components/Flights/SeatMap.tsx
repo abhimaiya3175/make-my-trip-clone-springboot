@@ -78,7 +78,7 @@ const SeatMap: React.FC<SeatMapProps> = ({ flightId, userId, requiredSeats = 1, 
       if (userId) {
         await releaseSeat(seat.id);
       }
-      setSelectedSeatIds(selectedSeatIds.filter(id => id !== seat.id));
+      setSelectedSeatIds((prev) => prev.filter((id) => id !== seat.id));
     } else {
       // Can we add more seats?
       if (selectedSeatIds.length >= requiredSeats) {
@@ -96,8 +96,15 @@ const SeatMap: React.FC<SeatMapProps> = ({ flightId, userId, requiredSeats = 1, 
         });
         const json = await res.json();
         if (res.ok) {
-          setSelectedSeatIds([...selectedSeatIds, seat.id]);
-          onSeatSelect?.([...selectedSeatIds.map(id => seats.find(s => s.id === id)).filter(Boolean) as SeatResponse[], json.data]);
+          const lockedSeat = json?.data as SeatResponse | undefined;
+          setSelectedSeatIds((prev) => {
+            const next = [...prev, seat.id];
+            const selected = next
+              .map((id) => (id === seat.id ? lockedSeat || seats.find((s) => s.id === id) : seats.find((s) => s.id === id)))
+              .filter(Boolean) as SeatResponse[];
+            onSeatSelect?.(selected);
+            return next;
+          });
           await fetchSeats();
         } else {
           if (res.status === 401) {
@@ -147,8 +154,9 @@ const SeatMap: React.FC<SeatMapProps> = ({ flightId, userId, requiredSeats = 1, 
       const allSuccessful = confirmResponses.every(res => res.ok);
       
       if (allSuccessful) {
-        const confirmedSeats = selectedSeatIds
-          .map(id => seats.find(s => s.id === id))
+        const confirmedPayloads = await Promise.all(confirmResponses.map((res) => res.json()));
+        const confirmedSeats = confirmedPayloads
+          .map((payload) => payload?.data as SeatResponse | undefined)
           .filter(Boolean) as SeatResponse[];
         
         onSeatConfirm?.(confirmedSeats);
@@ -193,7 +201,18 @@ const SeatMap: React.FC<SeatMapProps> = ({ flightId, userId, requiredSeats = 1, 
       <CardHeader>
         <CardTitle>Select Your Seat</CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="relative">
+        {/* Cover screen overlay when action is in progress */}
+        {actionLoading && (
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm rounded-lg z-40 flex items-center justify-center">
+            <div className="flex flex-col items-center gap-3">
+              <div className="w-8 h-8 rounded-full border-3 border-white border-t-blue-500 animate-spin"></div>
+              <p className="text-white font-semibold text-lg">Processing...</p>
+              <p className="text-white/80 text-sm">Please wait while we confirm your seat</p>
+            </div>
+          </div>
+        )}
+
         {error && (
           <div className="bg-red-50 text-red-600 text-sm p-2 rounded mb-3">{error}</div>
         )}

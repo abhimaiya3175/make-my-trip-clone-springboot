@@ -51,7 +51,7 @@ const Navbar = () => {
     { href: "/pricing", label: "Pricing", icon: <BadgeIndianRupee className="w-4 h-4" /> },
     { href: "/flight-status", label: "Flight Status", icon: <Plane className="w-4 h-4" /> },
     { href: "/recommendations/suggestions", label: "Recommendations", icon: <Building2 className="w-4 h-4" /> },
-    { href: "/reviews/review", label: "Reviews", icon: <MessageSquareText className="w-4 h-4" /> },
+    { href: "/reviews", label: "Reviews", icon: <MessageSquareText className="w-4 h-4" /> },
     { href: "/cancellations", label: "Cancellations", icon: <FileX2 className="w-4 h-4" /> },
     { href: "/profile", label: "Profile", icon: <User className="w-4 h-4" /> },
   ];

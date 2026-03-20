@@ -21,6 +21,15 @@ public class JwtService {
     @Value("${app.jwt.expiration-ms:86400000}")
     private long jwtExpirationMs;
 
+    @jakarta.annotation.PostConstruct
+    public void validateSecret() {
+        if (jwtSecret == null || jwtSecret.isBlank()) {
+            throw new IllegalStateException(
+                "JWT_SECRET environment variable is not set. " +
+                "Generate with: openssl rand -hex 32");
+        }
+    }
+
     public String generateToken(User user) {
         long now = System.currentTimeMillis();
         Date issuedAt = new Date(now);

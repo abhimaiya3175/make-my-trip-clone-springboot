@@ -3,8 +3,8 @@
  * Import directly from @/services/* for new code.
  */
 export { login, signup, getuserbyemail, editprofile } from "@/services/authService";
-export { getflight, addflight, editflight } from "@/services/flightService";
-export { gethotel, addhotel, edithotel } from "@/services/hotelService";
+export { getflight, addflight, editflight, getFlightById } from "@/services/flightService";
+export { gethotel, addhotel, edithotel, getHotelById } from "@/services/hotelService";
 export { handleflightbooking, handlehotelbooking, getUserBookings, getBookingById, cancelBooking } from "@/services/bookingService";
 export {
   getCancellationReasons,

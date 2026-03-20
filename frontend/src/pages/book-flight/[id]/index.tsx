@@ -53,6 +53,8 @@ import { setUser } from "@/store";
 import SeatMap from "@/components/Flights/SeatMap";
 import PriceFreezeButton from "@/components/pricing/PriceFreezeButton";
 import PriceHistoryChart from "@/components/pricing/PriceHistoryChart";
+import ReviewForm from "@/components/reviews/ReviewForm";
+import ReviewList from "@/components/reviews/ReviewList";
 
 const BookFlightPage = () => {
   const router = useRouter();
@@ -63,7 +65,9 @@ const BookFlightPage = () => {
   const [open, setopem] = useState(false);
   const [selectedSeats, setSelectedSeats] = useState<SelectedSeatInfo[]>([]);
   const [showSeatSelector, setShowSeatSelector] = useState(true);
+  const [showReviewForm, setShowReviewForm] = useState(false);
   const user = useSelector((state: any) => state.user.user);
+  const currentUserId = user?.id || user?._id;
   const dispatch = useDispatch();
   useEffect(() => {
     const fetchFlight = async () => {
@@ -222,7 +226,7 @@ const BookFlightPage = () => {
       futureDate.setDate(futureDate.getDate() + 7);
       const travelDate = futureDate.toISOString().substring(0, 10);
       const data = await handleflightbooking(
-        user?.id,
+        currentUserId,
         flight?.id,
         quantity,
         grandTotal,
@@ -352,7 +356,7 @@ const BookFlightPage = () => {
             ) : (
               <SeatMap
                 flightId={flight?.id as string}
-                userId={user?.id as string}
+                userId={currentUserId as string}
                 requiredSeats={quantity}
                 onSeatConfirm={handleSeatConfirmed}
               />
@@ -736,6 +740,44 @@ const BookFlightPage = () => {
                     </div>
                   ))}
                 </div>
+              </div>
+
+              {/* Reviews Section */}
+              <div className="mt-8 bg-white rounded-xl shadow-lg p-6">
+                <div className="flex justify-between items-center mb-6">
+                  <h3 className="font-semibold text-lg">Passenger Reviews</h3>
+                  {currentUserId && (
+                    <button
+                      onClick={() => setShowReviewForm(!showReviewForm)}
+                      className={`px-4 py-2 rounded-lg font-semibold transition-colors ${
+                        showReviewForm
+                          ? "bg-gray-200 text-gray-800 hover:bg-gray-300"
+                          : "bg-blue-600 text-white hover:bg-blue-700"
+                      }`}
+                    >
+                      {showReviewForm ? "Cancel" : "Write a Review"}
+                    </button>
+                  )}
+                </div>
+
+                {showReviewForm && currentUserId && (
+                  <div className="mb-6 pb-6 border-b">
+                    <ReviewForm
+                      entityType="FLIGHT"
+                      entityId={flight?.id as string}
+                      userId={currentUserId}
+                      userName={user?.name || "Anonymous"}
+                      onSuccess={() => setShowReviewForm(false)}
+                    />
+                  </div>
+                )}
+
+                <ReviewList
+                  entityType="FLIGHT"
+                  entityId={flight?.id as string}
+                  currentUserId={currentUserId}
+                  currentUserName={user?.name || "Anonymous"}
+                />
               </div>
             </div>
           </div>

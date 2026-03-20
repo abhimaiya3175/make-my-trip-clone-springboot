@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Button } from "../ui/button";
 import { X, ChevronLeft, ChevronRight, Eye } from "lucide-react";
@@ -31,6 +32,18 @@ interface RoomResponse {
   lockedByMe: boolean;
 }
 
+type RoomViewMode = "BUILDING" | "GRID";
+type FloorPreference = "ANY" | "LOW" | "HIGH";
+type RoomPreference = "ANY" | "STANDARD" | "DELUXE" | "SUITE" | "PENTHOUSE";
+type RoomVisualState = "AVAILABLE" | "BOOKED" | "CLEANING" | "SELECTED";
+
+interface RoomPreferences {
+  preferredFloor: FloorPreference;
+  preferredRoomType: RoomPreference;
+  budgetMin: number;
+  budgetMax: number;
+}
+
 interface RoomGridProps {
   hotelId: string;
   userId?: string;
@@ -38,22 +51,40 @@ interface RoomGridProps {
   onRoomConfirm?: (room: RoomResponse) => void;
 }
 
-const ROOM_TYPE_CONFIG: Record<string, { color: string; label: string; icon: string }> = {
-  STANDARD: { color: "bg-green-50 border-green-200 hover:bg-green-100", label: "Standard", icon: "🛏️" },
-  DELUXE: { color: "bg-purple-50 border-purple-200 hover:bg-purple-100", label: "Deluxe", icon: "✨" },
-  SUITE: { color: "bg-amber-50 border-amber-200 hover:bg-amber-100", label: "Suite", icon: "🌟" },
-  PENTHOUSE: { color: "bg-rose-50 border-rose-200 hover:bg-rose-100", label: "Penthouse", icon: "👑" },
+const ROOM_TYPE_CONFIG: Record<string, { label: string; icon: string }> = {
+  STANDARD: { label: "Standard", icon: "🛏️" },
+  DELUXE: { label: "Deluxe", icon: "✨" },
+  SUITE: { label: "Suite", icon: "🌟" },
+  PENTHOUSE: { label: "Penthouse", icon: "👑" },
+};
+
+const VISUAL_STATE_STYLE: Record<RoomVisualState, string> = {
+  AVAILABLE: "bg-emerald-50 border-emerald-300 text-emerald-900 hover:bg-emerald-100",
+  BOOKED: "bg-rose-50 border-rose-200 text-rose-900 opacity-70 cursor-not-allowed",
+  CLEANING: "bg-amber-50 border-amber-300 text-amber-900 opacity-80 cursor-not-allowed",
+  SELECTED: "bg-blue-50 border-blue-500 text-blue-900 ring-2 ring-blue-300",
+};
+
+const DEFAULT_PREFERENCES: RoomPreferences = {
+  preferredFloor: "ANY",
+  preferredRoomType: "ANY",
+  budgetMin: 0,
+  budgetMax: 0,
 };
 
 const RoomGrid: React.FC<RoomGridProps> = ({ hotelId, userId, onRoomSelect, onRoomConfirm }) => {
   const [rooms, setRooms] = useState<RoomResponse[]>([]);
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<RoomViewMode>("BUILDING");
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [preferences, setPreferences] = useState<RoomPreferences>(DEFAULT_PREFERENCES);
 
   const [previewRoom, setPreviewRoom] = useState<RoomResponse | null>(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+
+  const preferenceStorageKey = `hotel-room-preferences-${hotelId}`;
 
   const fetchRooms = useCallback(async () => {
     setLoading(true);
@@ -76,6 +107,55 @@ const RoomGrid: React.FC<RoomGridProps> = ({ hotelId, userId, onRoomSelect, onRo
   useEffect(() => {
     if (hotelId) fetchRooms();
   }, [hotelId, fetchRooms]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const raw = localStorage.getItem(preferenceStorageKey);
+      if (!raw) {
+        setPreferences(DEFAULT_PREFERENCES);
+        return;
+      }
+      const parsed = JSON.parse(raw) as Partial<RoomPreferences>;
+      setPreferences((prev) => ({
+        ...prev,
+        preferredFloor: (parsed.preferredFloor as FloorPreference) || "ANY",
+        preferredRoomType: (parsed.preferredRoomType as RoomPreference) || "ANY",
+        budgetMin: typeof parsed.budgetMin === "number" ? parsed.budgetMin : 0,
+        budgetMax: typeof parsed.budgetMax === "number" ? parsed.budgetMax : 0,
+      }));
+    } catch {
+      setPreferences(DEFAULT_PREFERENCES);
+    }
+  }, [preferenceStorageKey]);
+
+  const minPrice = useMemo(() => {
+    if (!rooms.length) return 0;
+    return Math.min(...rooms.map((room) => room.pricePerNight));
+  }, [rooms]);
+
+  const maxPrice = useMemo(() => {
+    if (!rooms.length) return 0;
+    return Math.max(...rooms.map((room) => room.pricePerNight));
+  }, [rooms]);
+
+  useEffect(() => {
+    if (!rooms.length) return;
+    setPreferences((prev) => {
+      const nextMin = prev.budgetMin === 0 ? minPrice : Math.max(minPrice, Math.min(prev.budgetMin, maxPrice));
+      const nextMax = prev.budgetMax === 0 ? maxPrice : Math.max(minPrice, Math.min(prev.budgetMax, maxPrice));
+      return {
+        ...prev,
+        budgetMin: Math.min(nextMin, nextMax),
+        budgetMax: Math.max(nextMin, nextMax),
+      };
+    });
+  }, [rooms, minPrice, maxPrice]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !hotelId) return;
+    localStorage.setItem(preferenceStorageKey, JSON.stringify(preferences));
+  }, [hotelId, preferenceStorageKey, preferences]);
 
   const openPreview = (e: React.MouseEvent, room: RoomResponse) => {
     e.stopPropagation();
@@ -211,94 +291,367 @@ const RoomGrid: React.FC<RoomGridProps> = ({ hotelId, userId, onRoomSelect, onRo
     }
   };
 
-  const getRoomCardStyle = (room: RoomResponse) => {
-    if (room.lockedByMe) return "border-2 border-blue-500 bg-blue-50 ring-2 ring-blue-200";
-    if (!room.available) return "border border-gray-300 bg-gray-100 opacity-60";
-    if (room.locked) return "border border-orange-300 bg-orange-50 opacity-75";
-    return `border ${ROOM_TYPE_CONFIG[room.roomType]?.color || "bg-white border-gray-200"}`;
+  const parseFloor = (roomNumber: string): number => {
+    if (/^PH/i.test(roomNumber)) return 99;
+    const onlyDigits = roomNumber.match(/\d+/)?.[0];
+    if (!onlyDigits) return 1;
+    const numeric = Number.parseInt(onlyDigits, 10);
+    if (Number.isNaN(numeric)) return 1;
+    if (numeric >= 100) return Math.max(1, Math.floor(numeric / 100));
+    return numeric;
   };
+
+  const getVisualState = (room: RoomResponse): RoomVisualState => {
+    if (room.id === selectedRoomId || room.lockedByMe) return "SELECTED";
+    if (!room.available) return "BOOKED";
+    if (room.locked) return "CLEANING";
+    return "AVAILABLE";
+  };
+
+  const averagePrice = useMemo(() => {
+    if (!rooms.length) return 0;
+    return rooms.reduce((acc, room) => acc + room.pricePerNight, 0) / rooms.length;
+  }, [rooms]);
+
+  const isPremiumRoom = useCallback((room: RoomResponse) => {
+    const floor = parseFloor(room.roomNumber);
+    const premiumType = ["DELUXE", "SUITE", "PENTHOUSE"].includes(room.roomType);
+    return premiumType || floor >= 3 || room.pricePerNight >= averagePrice * 1.25;
+  }, [averagePrice]);
+
+  const isRoomSelectable = (room: RoomResponse) => room.available && (!room.locked || room.lockedByMe);
+
+  const scoreRoomByPreferences = useCallback((room: RoomResponse) => {
+    if (!isRoomSelectable(room)) return -1;
+    let score = 0;
+    const floor = parseFloor(room.roomNumber);
+
+    if (preferences.preferredRoomType !== "ANY" && room.roomType === preferences.preferredRoomType) score += 4;
+    if (preferences.preferredRoomType === "ANY") score += 1;
+
+    if (preferences.preferredFloor === "LOW") {
+      score += floor <= 2 ? 3 : 0;
+    } else if (preferences.preferredFloor === "HIGH") {
+      score += floor >= 3 ? 3 : 0;
+    } else {
+      score += 1;
+    }
+
+    if (room.pricePerNight >= preferences.budgetMin && room.pricePerNight <= preferences.budgetMax) {
+      score += 3;
+    }
+
+    if (isPremiumRoom(room)) score += 1;
+    return score;
+  }, [isPremiumRoom, preferences]);
+
+  const suggestedRoomId = useMemo(() => {
+    if (!rooms.length) return null;
+    const ranked = rooms
+      .map((room) => ({ room, score: scoreRoomByPreferences(room) }))
+      .filter((entry) => entry.score >= 0)
+      .sort((a, b) => b.score - a.score || a.room.pricePerNight - b.room.pricePerNight);
+    return ranked[0]?.room.id || null;
+  }, [rooms, scoreRoomByPreferences]);
+
+  const premiumRooms = useMemo(() => rooms.filter((room) => isPremiumRoom(room)), [rooms, isPremiumRoom]);
+
+  const bestValuePremiumId = useMemo(() => {
+    const candidate = premiumRooms
+      .filter((room) => isRoomSelectable(room))
+      .sort((a, b) => a.pricePerNight - b.pricePerNight)[0];
+    return candidate?.id || null;
+  }, [premiumRooms]);
 
   const selectedRoom = rooms.find(r => r.id === selectedRoomId);
 
+  const upgradeSuggestion = useMemo(() => {
+    if (!selectedRoom || selectedRoom.roomType !== "STANDARD") return null;
+    const premiumCandidate = rooms
+      .filter((room) => ["DELUXE", "SUITE", "PENTHOUSE"].includes(room.roomType) && isRoomSelectable(room))
+      .sort((a, b) => a.pricePerNight - b.pricePerNight)[0];
+    if (!premiumCandidate) return null;
+    return {
+      room: premiumCandidate,
+      extra: Math.max(0, premiumCandidate.pricePerNight - selectedRoom.pricePerNight),
+    };
+  }, [rooms, selectedRoom]);
+
+  const roomsByFloor = useMemo(() => {
+    const grouped = rooms.reduce<Record<number, RoomResponse[]>>((acc, room) => {
+      const floor = parseFloor(room.roomNumber);
+      (acc[floor] = acc[floor] || []).push(room);
+      return acc;
+    }, {});
+
+    Object.values(grouped).forEach((floorRooms) => {
+      floorRooms.sort((a, b) => a.roomNumber.localeCompare(b.roomNumber));
+    });
+
+    return Object.entries(grouped)
+      .map(([floor, floorRooms]) => ({ floor: Number.parseInt(floor, 10), rooms: floorRooms }))
+      .sort((a, b) => b.floor - a.floor);
+  }, [rooms]);
+
   // Group rooms by type
-  const roomsByType = rooms.reduce<Record<string, RoomResponse[]>>((acc, room) => {
-    (acc[room.roomType] = acc[room.roomType] || []).push(room);
-    return acc;
-  }, {});
+  const roomsByType = useMemo(() => {
+    const grouped = rooms.reduce<Record<string, RoomResponse[]>>((acc, room) => {
+      (acc[room.roomType] = acc[room.roomType] || []).push(room);
+      return acc;
+    }, {});
+    Object.values(grouped).forEach((typedRooms) => {
+      typedRooms.sort((a, b) => a.pricePerNight - b.pricePerNight);
+    });
+    return grouped;
+  }, [rooms]);
+
+  const roomTooltip = (room: RoomResponse) => {
+    const visual = getVisualState(room);
+    const stateLabel = visual === "CLEANING" ? "Cleaning / Maintenance" : visual;
+    return [
+      `Room ${room.roomNumber} (${ROOM_TYPE_CONFIG[room.roomType]?.label || room.roomType})`,
+      `Price: ₹${room.pricePerNight}/night`,
+      `Capacity: ${room.maxOccupancy} guest(s)`,
+      `Status: ${stateLabel}`,
+      room.amenities.length ? `Amenities: ${room.amenities.join(", ")}` : "Amenities: -",
+    ].join("\n");
+  };
+
+  const RoomTile = ({ room, compact = false }: { room: RoomResponse; compact?: boolean }) => {
+    const visualState = getVisualState(room);
+    const isPremium = isPremiumRoom(room);
+    const isSuggested = room.id === suggestedRoomId;
+    const isBestValue = room.id === bestValuePremiumId;
+    const selectable = isRoomSelectable(room) && !actionLoading;
+
+    return (
+      <div
+        key={room.id}
+        role="button"
+        title={roomTooltip(room)}
+        onClick={() => {
+          if (selectable) handleSelect(room);
+        }}
+        className={[
+          "rounded-xl border p-3 transition-all duration-200",
+          compact ? "min-h-[96px]" : "min-h-[140px]",
+          VISUAL_STATE_STYLE[visualState],
+          selectable ? "cursor-pointer hover:-translate-y-0.5 hover:shadow-md" : "",
+          isPremium ? "shadow-[0_0_0_1px_rgba(234,179,8,0.35)]" : "",
+          isSuggested ? "ring-2 ring-indigo-300" : "",
+        ].join(" ")}
+      >
+        <div className="flex items-start justify-between gap-2 mb-1">
+          <div>
+            <p className="font-semibold leading-tight">{room.roomNumber}</p>
+            <p className="text-xs opacity-80">{ROOM_TYPE_CONFIG[room.roomType]?.label || room.roomType}</p>
+          </div>
+          <div className="flex flex-col items-end gap-1">
+            {isSuggested && (
+              <span className="text-[10px] bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">Recommended</span>
+            )}
+            {isBestValue && (
+              <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">Best Value</span>
+            )}
+          </div>
+        </div>
+
+        <p className="text-sm font-bold">₹{room.pricePerNight}<span className="text-xs font-normal"> / night</span></p>
+        <p className="text-xs opacity-80">Up to {room.maxOccupancy} guests</p>
+        {!compact && room.amenities.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1">
+            {room.amenities.slice(0, 3).map((amenity) => (
+              <span key={amenity} className="text-[10px] bg-white/80 border px-1.5 py-0.5 rounded">
+                {amenity}
+              </span>
+            ))}
+            {room.amenities.length > 3 && (
+              <span className="text-[10px] opacity-80">+{room.amenities.length - 3}</span>
+            )}
+          </div>
+        )}
+
+        {room.images && room.images.length > 0 && !compact && (
+          <Button
+            type="button"
+            className="mt-2 w-full text-xs h-8 flex items-center justify-center gap-1 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300"
+            onClick={(e) => openPreview(e, room)}
+          >
+            <Eye className="w-3 h-3" /> Preview
+          </Button>
+        )}
+      </div>
+    );
+  };
 
   if (loading) return <p className="text-center py-4">Loading room inventory...</p>;
 
   return (
-    <Card>
-      <CardHeader>
+    <Card className="flex flex-col h-full">
+      <CardHeader className="sticky top-0 bg-white z-20 border-b">
         <CardTitle>Select Your Room</CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="relative flex-1 overflow-y-auto">
+        {/* Cover screen overlay when action is in progress */}
+        {actionLoading && (
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center">
+            <div className="flex flex-col items-center gap-3">
+              <div className="w-8 h-8 rounded-full border-3 border-white border-t-blue-500 animate-spin"></div>
+              <p className="text-white font-semibold text-lg">Processing...</p>
+              <p className="text-white/80 text-sm">Please wait while we confirm your room</p>
+            </div>
+          </div>
+        )}
+
         {error && (
           <div className="bg-red-50 text-red-600 text-sm p-2 rounded mb-3">{error}</div>
         )}
 
         {rooms.length > 0 ? (
           <>
-            {Object.entries(roomsByType).map(([type, typeRooms]) => {
-              const config = ROOM_TYPE_CONFIG[type] || { label: type, icon: "🏨", color: "" };
-              return (
-                <div key={type} className="mb-6">
-                  <h3 className="text-sm font-semibold text-gray-700 mb-2">
-                    {config.icon} {config.label}
-                  </h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {typeRooms.map((room) => (
-                      <div
-                        key={room.id}
-                        role="button"
-                        onClick={() => {
-                          if (!(!room.available || (room.locked && !room.lockedByMe) || actionLoading)) {
-                            handleSelect(room);
-                          }
-                        }}
-                        className={`p-3 rounded-lg text-left transition-all focus:outline-none ${!room.available || (room.locked && !room.lockedByMe) || actionLoading ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:ring-2 hover:ring-blue-300'} ${getRoomCardStyle(room)}`}
-                      >
-                        <div className="flex justify-between items-start">
-                          <span className="font-medium">Room {room.roomNumber}</span>
-                          {!room.available && <span className="text-xs text-red-500 font-medium">Booked</span>}
-                          {room.locked && !room.lockedByMe && <span className="text-xs text-orange-500 font-medium">Held</span>}
-                          {room.lockedByMe && <span className="text-xs text-blue-600 font-medium">Selected</span>}
-                        </div>
-                        <p className="text-lg font-bold mt-1">₹{room.pricePerNight}<span className="text-xs font-normal text-gray-500">/night</span></p>
-                        <p className="text-xs text-gray-500">Up to {room.maxOccupancy} guests</p>
-                        {room.amenities.length > 0 && (
-                          <div className="flex flex-wrap gap-1 mt-2">
-                            {room.amenities.slice(0, 3).map((a) => (
-                              <span key={a} className="text-[10px] bg-white/80 px-1.5 py-0.5 rounded border">{a}</span>
-                            ))}
-                            {room.amenities.length > 3 && (
-                              <span className="text-[10px] text-gray-400">+{room.amenities.length - 3} more</span>
-                            )}
-                          </div>
-                        )}
-                        
-                        {room.images && room.images.length > 0 && (
-                          <div className="mt-3">
-                            <Button 
-                              type="button"
-                              className="w-full text-xs flex items-center justify-center gap-1 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300" 
-                              onClick={(e) => openPreview(e, room)}
-                            >
-                              <Eye className="w-3 h-3" /> Preview Room
-                            </Button>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
+            <div className="mb-4 rounded-xl border border-gray-200 bg-white p-3 sticky top-0 z-10">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant={viewMode === "BUILDING" ? "default" : "outline"}
+                    className="h-8"
+                    onClick={() => setViewMode("BUILDING")}
+                  >
+                    Building View
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={viewMode === "GRID" ? "default" : "outline"}
+                    className="h-8"
+                    onClick={() => setViewMode("GRID")}
+                  >
+                    Room-Type Grid
+                  </Button>
                 </div>
-              );
-            })}
+
+                <p className="text-xs text-gray-500">Preferences auto-saved for this hotel</p>
+              </div>
+
+              <div className="mt-3 grid grid-cols-1 md:grid-cols-4 gap-3">
+                <label className="text-xs font-medium text-gray-600">
+                  Preferred Floor
+                  <select
+                    className="mt-1 w-full rounded-md border px-2 py-1.5 text-sm"
+                    value={preferences.preferredFloor}
+                    onChange={(e) => setPreferences((prev) => ({ ...prev, preferredFloor: e.target.value as FloorPreference }))}
+                  >
+                    <option value="ANY">Any</option>
+                    <option value="LOW">Low Floor</option>
+                    <option value="HIGH">High Floor</option>
+                  </select>
+                </label>
+
+                <label className="text-xs font-medium text-gray-600">
+                  Preferred Room Type
+                  <select
+                    className="mt-1 w-full rounded-md border px-2 py-1.5 text-sm"
+                    value={preferences.preferredRoomType}
+                    onChange={(e) => setPreferences((prev) => ({ ...prev, preferredRoomType: e.target.value as RoomPreference }))}
+                  >
+                    <option value="ANY">Any</option>
+                    <option value="STANDARD">Standard</option>
+                    <option value="DELUXE">Deluxe</option>
+                    <option value="SUITE">Suite</option>
+                    <option value="PENTHOUSE">Penthouse</option>
+                  </select>
+                </label>
+
+                <label className="text-xs font-medium text-gray-600">
+                  Budget Min
+                  <input
+                    type="number"
+                    min={minPrice}
+                    max={preferences.budgetMax || maxPrice}
+                    className="mt-1 w-full rounded-md border px-2 py-1.5 text-sm"
+                    value={preferences.budgetMin || minPrice}
+                    onChange={(e) => {
+                      const next = Number.parseInt(e.target.value, 10) || minPrice;
+                      setPreferences((prev) => ({
+                        ...prev,
+                        budgetMin: Math.max(minPrice, Math.min(next, prev.budgetMax || maxPrice)),
+                      }));
+                    }}
+                  />
+                </label>
+
+                <label className="text-xs font-medium text-gray-600">
+                  Budget Max
+                  <input
+                    type="number"
+                    min={preferences.budgetMin || minPrice}
+                    max={maxPrice}
+                    className="mt-1 w-full rounded-md border px-2 py-1.5 text-sm"
+                    value={preferences.budgetMax || maxPrice}
+                    onChange={(e) => {
+                      const next = Number.parseInt(e.target.value, 10) || maxPrice;
+                      setPreferences((prev) => ({
+                        ...prev,
+                        budgetMax: Math.min(maxPrice, Math.max(next, prev.budgetMin || minPrice)),
+                      }));
+                    }}
+                  />
+                </label>
+              </div>
+            </div>
+
+            <div className="mb-4 rounded-xl border bg-gray-50 p-3">
+              <h4 className="text-sm font-semibold mb-2">Legend</h4>
+              <div className="flex flex-wrap gap-2 text-xs">
+                <span className="px-2 py-1 rounded bg-emerald-100 text-emerald-800 border border-emerald-300">Available</span>
+                <span className="px-2 py-1 rounded bg-rose-100 text-rose-800 border border-rose-300">Booked</span>
+                <span className="px-2 py-1 rounded bg-amber-100 text-amber-800 border border-amber-300">Cleaning / Maintenance</span>
+                <span className="px-2 py-1 rounded bg-blue-100 text-blue-800 border border-blue-300">Selected</span>
+                <span className="px-2 py-1 rounded bg-yellow-100 text-yellow-800 border border-yellow-300">Premium</span>
+              </div>
+            </div>
+
+            {viewMode === "BUILDING" ? (
+              <div className="space-y-3">
+                {roomsByFloor.map(({ floor, rooms: floorRooms }) => (
+                  <div key={floor} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="text-sm font-semibold text-slate-800">
+                        {floor === 99 ? "Penthouse" : `Floor ${floor}`}
+                      </h4>
+                      <span className="text-[11px] text-gray-500">{floorRooms.length} room(s)</span>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+                      {floorRooms.map((room) => (
+                        <RoomTile key={room.id} room={room} compact />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-5">
+                {Object.entries(roomsByType).map(([type, typeRooms]) => {
+                  const config = ROOM_TYPE_CONFIG[type] || { label: type, icon: "🏨" };
+                  return (
+                    <div key={type} className="rounded-xl border border-gray-200 p-3 bg-white">
+                      <h3 className="text-sm font-semibold text-gray-700 mb-3">
+                        {config.icon} {config.label}
+                      </h3>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+                        {typeRooms.map((room) => (
+                          <RoomTile key={room.id} room={room} />
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
 
             {/* Selected room summary + confirm */}
             {selectedRoom && (
-              <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+              <div className="sticky bottom-0 mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200 z-20 bg-gradient-to-b from-blue-50 to-blue-100">
                 <div className="flex justify-between items-center">
                   <div>
                     <p className="font-semibold">
@@ -308,6 +661,9 @@ const RoomGrid: React.FC<RoomGridProps> = ({ hotelId, userId, onRoomSelect, onRo
                       Up to {selectedRoom.maxOccupancy} guests · {selectedRoom.amenities.join(", ")}
                     </p>
                     <p className="font-bold text-lg mt-1">₹{selectedRoom.pricePerNight}/night</p>
+                    {isPremiumRoom(selectedRoom) && (
+                      <p className="text-xs text-amber-700 mt-1">Premium room perks active</p>
+                    )}
                   </div>
                   {userId && (
                     <Button onClick={handleConfirm} disabled={actionLoading}>
@@ -315,6 +671,24 @@ const RoomGrid: React.FC<RoomGridProps> = ({ hotelId, userId, onRoomSelect, onRo
                     </Button>
                   )}
                 </div>
+
+                {upgradeSuggestion && (
+                  <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-3">
+                    <p className="text-sm font-medium text-amber-900">
+                      Upgrade to {ROOM_TYPE_CONFIG[upgradeSuggestion.room.roomType]?.label} for +₹{upgradeSuggestion.extra}
+                    </p>
+                    <p className="text-xs text-amber-800 mt-1">
+                      Room {upgradeSuggestion.room.roomNumber} includes {upgradeSuggestion.room.amenities.slice(0, 2).join(", ")} and more.
+                    </p>
+                    <Button
+                      type="button"
+                      className="mt-2 h-8 text-xs"
+                      onClick={() => handleSelect(upgradeSuggestion.room)}
+                    >
+                      Choose Upgrade
+                    </Button>
+                  </div>
+                )}
               </div>
             )}
           </>
@@ -324,7 +698,7 @@ const RoomGrid: React.FC<RoomGridProps> = ({ hotelId, userId, onRoomSelect, onRo
       </CardContent>
 
       {/* Preview Modal */}
-      {previewRoom && (
+      {typeof window !== "undefined" && previewRoom && createPortal((
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setPreviewRoom(null)}>
           <div className="relative w-full max-w-4xl bg-white rounded-lg shadow-xl overflow-hidden" onClick={e => e.stopPropagation()}>
             <div className="flex justify-between items-center p-4 border-b">
@@ -385,7 +759,7 @@ const RoomGrid: React.FC<RoomGridProps> = ({ hotelId, userId, onRoomSelect, onRo
             </div>
           </div>
         </div>
-      )}
+      ), document.body)}
     </Card>
   );
 };

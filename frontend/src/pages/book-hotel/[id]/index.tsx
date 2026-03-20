@@ -15,7 +15,7 @@ import {
   Home,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { gethotel, handlehotelbooking } from "@/api";
+import { getHotelById, handlehotelbooking } from "@/api";
 interface Hotel {
   id: string; // Unique identifier for the hotel
   hotelName: string; // Name of the hotel
@@ -41,26 +41,27 @@ import { setUser } from "@/store";
 import RoomGrid from "@/components/Hotel/RoomGrid";
 import PriceFreezeButton from "@/components/pricing/PriceFreezeButton";
 import PriceHistoryChart from "@/components/pricing/PriceHistoryChart";
+import ReviewForm from "@/components/reviews/ReviewForm";
+import ReviewList from "@/components/reviews/ReviewList";
 
 const BookHotelPage = () => {
   const [quantity, setQuantity] = useState(1);
+  const [showReviewForm, setShowReviewForm] = useState(false);
   const router = useRouter();
   const { id } = router.query; // Access the hotel ID from the URL
   const [hotels, sethotels] = useState<Hotel[]>([]);
   const [loading, setLoading] = useState(true);
   const user = useSelector((state: any) => state.user.user);
+  const currentUserId = user?.id || user?._id;
   const [open, setopem] = useState(false);
   const dispatch = useDispatch();
   useEffect(() => {
     const fetchhotels = async () => {
       try {
-        const data = await gethotel();
-        if (data && Array.isArray(data)) {
-          const filteredData = data.filter((hotel: any) => hotel.id === id);
-          sethotels(filteredData);
-        }
+        const data = await getHotelById(id as string);
+        if (data) sethotels([data]);
       } catch (error) {
-        console.error("Error fetching hotels:", error);
+        console.error("Error fetching hotel:", error);
       } finally {
         setLoading(false);
       }
@@ -176,14 +177,14 @@ const BookHotelPage = () => {
     }
   };
   const HotelContent = () => (
-    <DialogContent className="sm:max-w-[600px] bg-white">
-      <DialogHeader>
+    <DialogContent className="sm:max-w-[700px] bg-white max-h-[90vh] flex flex-col overflow-hidden">
+      <DialogHeader className="shrink-0">
         <DialogTitle className="text-2xl font-bold flex items-center">
           <Home className="w-6 h-6 mr-2" />
           Hotel Booking Details
         </DialogTitle>
       </DialogHeader>
-      <div className="grid gap-6 mt-4">
+      <div className="grid gap-6 mt-4 flex-1 overflow-y-auto pr-1">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Hotel Name */}
           <div className="space-y-2">
@@ -241,7 +242,7 @@ const BookHotelPage = () => {
           </div>
           <div className="md:col-span-2 mt-4 bg-gray-50 p-4 rounded-xl border">
             <h3 className="font-semibold text-gray-800 mb-2">Select Your Room Type</h3>
-            <RoomGrid hotelId={hotel?.id as string} userId={user?.id as string} />
+            <RoomGrid hotelId={hotel?.id as string} userId={currentUserId as string} />
           </div>
         </div>
         <div className="bg-gray-100 rounded-lg p-4">
@@ -279,7 +280,7 @@ const BookHotelPage = () => {
           </div>
         </div>
       </div>
-      <Button className="w-full mt-4" onClick={handlebooking}>Proceed to Payment</Button>
+      <Button className="w-full mt-4 shrink-0" onClick={handlebooking}>Proceed to Payment</Button>
     </DialogContent>
   );
   return (
@@ -510,9 +511,12 @@ const BookHotelPage = () => {
                     </div>
                   </div>
                 </div>
-                <a href="#" className="text-blue-500">
+                <button
+                  onClick={() => router.push(`/reviews?entityType=HOTEL&entityId=${hotel?.id}`)}
+                  className="text-blue-500 hover:underline"
+                >
                   All Reviews
-                </a>
+                </button>
               </div>
             </div>
 
@@ -526,6 +530,44 @@ const BookHotelPage = () => {
                 </div>
                 <button className="text-blue-500">See on Map</button>
               </div>
+            </div>
+
+            {/* Reviews Section */}
+            <div className="bg-white rounded-xl shadow-lg p-6 mt-6">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="font-semibold text-lg">Guest Reviews</h3>
+                {currentUserId && (
+                  <button
+                    onClick={() => setShowReviewForm(!showReviewForm)}
+                    className={`px-4 py-2 rounded-lg font-semibold transition-colors ${
+                      showReviewForm
+                        ? "bg-gray-200 text-gray-800 hover:bg-gray-300"
+                        : "bg-blue-600 text-white hover:bg-blue-700"
+                    }`}
+                  >
+                    {showReviewForm ? "Cancel" : "Write a Review"}
+                  </button>
+                )}
+              </div>
+
+              {showReviewForm && currentUserId && (
+                <div className="mb-6 pb-6 border-b">
+                  <ReviewForm
+                    entityType="HOTEL"
+                    entityId={hotel?.id as string}
+                    userId={currentUserId}
+                    userName={user?.name || "Anonymous"}
+                    onSuccess={() => setShowReviewForm(false)}
+                  />
+                </div>
+              )}
+
+              <ReviewList
+                entityType="HOTEL"
+                entityId={hotel?.id as string}
+                currentUserId={currentUserId}
+                currentUserName={user?.name || "Anonymous"}
+              />
             </div>
           </div>
         </div>

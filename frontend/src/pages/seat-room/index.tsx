@@ -8,6 +8,7 @@ import Loader from "@/components/Loader";
 
 export default function SeatRoomPage() {
   const user = useSelector((state: any) => state.user.user);
+  const currentUserId = user?.id || user?._id;
   const [mode, setMode] = useState<"flight" | "hotel">("flight");
   const [loading, setLoading] = useState(true);
   const [flights, setFlights] = useState<any[]>([]);
@@ -100,7 +101,7 @@ export default function SeatRoomPage() {
                 </p>
               )}
             </div>
-            {selectedFlightId && <SeatMap flightId={selectedFlightId} userId={user?.id} />}
+            {selectedFlightId && <SeatMap flightId={selectedFlightId} userId={currentUserId} />}
           </div>
         ) : (
           <div className="space-y-4">
@@ -123,7 +124,7 @@ export default function SeatRoomPage() {
                 </p>
               )}
             </div>
-            {selectedHotelId && <RoomGrid hotelId={selectedHotelId} userId={user?.id} />}
+            {selectedHotelId && <RoomGrid hotelId={selectedHotelId} userId={currentUserId} />}
           </div>
         )}
       </div>

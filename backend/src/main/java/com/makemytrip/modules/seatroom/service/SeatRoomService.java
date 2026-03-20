@@ -17,6 +17,7 @@ import jakarta.annotation.PostConstruct;
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 @Slf4j
@@ -234,16 +235,129 @@ public class SeatRoomService {
     // ── Room operations ──────────────────────────────────────────────
 
     public List<RoomResponse> getRoomsByHotelId(String hotelId, String userId) {
+        ensureRoomInventoryForHotel(hotelId);
         return roomRepository.findByHotelId(hotelId).stream()
                 .map(room -> mapRoomResponse(room, userId))
                 .toList();
     }
 
     public List<RoomResponse> getAvailableRooms(String hotelId, String userId) {
+        ensureRoomInventoryForHotel(hotelId);
         return roomRepository.findByHotelIdAndAvailable(hotelId, true).stream()
                 .filter(room -> !room.isLocked() || userId.equals(room.getLockedByUserId()))
                 .map(room -> mapRoomResponse(room, userId))
                 .toList();
+    }
+
+    private void ensureRoomInventoryForHotel(String hotelId) {
+        if (hotelId == null || hotelId.isBlank() || roomRepository.existsByHotelId(hotelId)) {
+            return;
+        }
+
+        try {
+            List<Room> generatedRooms = new ArrayList<>();
+            int seed = Math.abs(hotelId.hashCode());
+            int floors = 3 + (seed % 4); // 3 to 6 floors
+
+            for (int floor = 1; floor <= floors; floor++) {
+                int roomsOnFloor = 4 + Math.abs((seed + floor * 31) % 3); // 4 to 6 rooms, irregular by floor
+
+                for (int roomIndex = 1; roomIndex <= roomsOnFloor; roomIndex++) {
+                    int roomNo = floor * 100 + roomIndex;
+                    RoomType roomType = resolveRoomType(floor, roomIndex, floors);
+                    double price = resolveRoomPrice(roomType) + (Math.abs(seed + floor * 17 + roomIndex * 13) % 6) * 250;
+                    boolean available = ((seed + floor * roomIndex) % 9) != 0;
+
+                    generatedRooms.add(Room.builder()
+                            .hotelId(hotelId)
+                            .roomNumber(String.valueOf(roomNo))
+                            .roomType(roomType)
+                            .available(available)
+                            .pricePerNight(price)
+                            .maxOccupancy(resolveMaxOccupancy(roomType))
+                            .amenities(resolveAmenities(roomType))
+                            .images(resolveImages(hotelId, roomNo))
+                            .isPanorama(roomType != RoomType.STANDARD)
+                            .lockedByUserId(null)
+                            .lockedUntil(null)
+                            .build());
+                }
+            }
+
+            if (floors >= 5) {
+                generatedRooms.add(Room.builder()
+                        .hotelId(hotelId)
+                        .roomNumber("PH01")
+                        .roomType(RoomType.PENTHOUSE)
+                        .available((seed % 4) != 0)
+                        .pricePerNight(22000 + (seed % 5) * 1000)
+                        .maxOccupancy(6)
+                        .amenities(Arrays.asList("WiFi", "Balcony", "Living Room", "Jacuzzi", "Private Pool"))
+                        .images(Arrays.asList(
+                                "https://picsum.photos/seed/" + hotelId + "-PH01-1/1200/600",
+                                "https://picsum.photos/seed/" + hotelId + "-PH01-2/1200/600"))
+                        .isPanorama(true)
+                        .lockedByUserId(null)
+                        .lockedUntil(null)
+                        .build());
+            }
+
+            roomRepository.saveAll(generatedRooms);
+            log.info("Generated {} rooms for hotel {}", generatedRooms.size(), hotelId);
+        } catch (Exception ex) {
+            // Another request may generate rooms concurrently; unique index protects integrity.
+            log.debug("Room inventory generation skipped for hotel {}: {}", hotelId, ex.getMessage());
+        }
+    }
+
+    private RoomType resolveRoomType(int floor, int roomIndex, int totalFloors) {
+        if (floor >= totalFloors - 1 && roomIndex <= 2) {
+            return RoomType.SUITE;
+        }
+        if (floor >= 3 || roomIndex == 1) {
+            return RoomType.DELUXE;
+        }
+        return RoomType.STANDARD;
+    }
+
+    private double resolveRoomPrice(RoomType roomType) {
+        return switch (roomType) {
+            case STANDARD -> 3200.0;
+            case DELUXE -> 5400.0;
+            case SUITE -> 9800.0;
+            case PENTHOUSE -> 20000.0;
+        };
+    }
+
+    private int resolveMaxOccupancy(RoomType roomType) {
+        return switch (roomType) {
+            case STANDARD -> 2;
+            case DELUXE -> 3;
+            case SUITE -> 4;
+            case PENTHOUSE -> 6;
+        };
+    }
+
+    private List<String> resolveAmenities(RoomType roomType) {
+        List<String> base = new ArrayList<>(Arrays.asList("WiFi", "AC", "TV"));
+        if (roomType == RoomType.DELUXE || roomType == RoomType.SUITE || roomType == RoomType.PENTHOUSE) {
+            base.add("Mini Bar");
+            base.add("Balcony");
+        }
+        if (roomType == RoomType.SUITE || roomType == RoomType.PENTHOUSE) {
+            base.add("Living Room");
+            base.add("Jacuzzi");
+        }
+        if (roomType == RoomType.PENTHOUSE) {
+            base.add("Private Pool");
+        }
+        return base;
+    }
+
+    private List<String> resolveImages(String hotelId, int roomNo) {
+        return Arrays.asList(
+                "https://picsum.photos/seed/" + hotelId + "-" + roomNo + "-1/1200/600",
+                "https://picsum.photos/seed/" + hotelId + "-" + roomNo + "-2/1200/600");
     }
 
     public RoomResponse lockRoom(String roomId, String userId) {
@@ -357,6 +471,7 @@ public class SeatRoomService {
                 .maxOccupancy(room.getMaxOccupancy())
                 .amenities(room.getAmenities())
                 .images(room.getImages())
+                .isPanorama(room.isPanorama())
                 .locked(room.isLocked())
                 .lockedByMe(userId != null && userId.equals(room.getLockedByUserId()))
                 .build();

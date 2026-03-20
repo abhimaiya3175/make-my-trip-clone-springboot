@@ -3,7 +3,7 @@ import RecommendationsSection from "@/components/recommendation/RecommendationsS
 import { useSelector } from "react-redux";
 
 export default function RecommendationsPage() {
-  const user = useSelector((state: any) => state.user);
+  const user = useSelector((state: any) => state.user.user);
   const userId = user?.id || user?._id || "guest";
 
   return (

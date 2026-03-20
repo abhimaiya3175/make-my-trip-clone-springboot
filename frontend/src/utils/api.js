@@ -1,4 +1,4 @@
-import axios from "axios";
+﻿import axios from "axios";
 
 const BACKEND_URL =
   process.env.NEXT_PUBLIC_BACKEND_URL ||
@@ -23,6 +23,32 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error?.response?.status === 401) {
+      const hadToken =
+        typeof window !== "undefined" && localStorage
+          ? Boolean(localStorage.getItem("authToken"))
+          : false;
+
+      if (typeof window !== "undefined" && localStorage) {
+        localStorage.removeItem("authToken");
+        localStorage.removeItem("user");
+      }
+      if (
+        hadToken &&
+        typeof window !== "undefined" &&
+        !window.location.pathname.includes("/auth/") &&
+        window.location.pathname !== "/"
+      ) {
+        window.location.href = "/";
+      }
+    }
+    return Promise.reject(error);
+  }
+);
 export const unwrapApiResponse = (resOrBody) => {
   // Handle both unwrapApiResponse(axiosRes) and unwrapApiResponse(axiosRes.data)
   const body = resOrBody?.data !== undefined && resOrBody?.status ? resOrBody.data : resOrBody;
@@ -34,3 +60,4 @@ export const unwrapApiResponse = (resOrBody) => {
 
 export default api;
 export { BACKEND_URL };
+

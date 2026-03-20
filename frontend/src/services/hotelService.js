@@ -1,8 +1,8 @@
-import api from "@/utils/api";
+import api, { unwrapApiResponse } from "@/utils/api";
 
 export const gethotel = async () => {
   try {
-    const res = await api.get(`/hotel`);
+    const res = await api.get(`/api/hotel`);
     return res.data;
   } catch (error) {
     console.log(error);
@@ -10,9 +10,14 @@ export const gethotel = async () => {
   }
 };
 
+export const getHotelById = async (id) => {
+  const res = await api.get(`/api/hotel/${id}`);
+  return unwrapApiResponse(res);
+};
+
 export const addhotel = async (hotelName, location, pricePerNight, availableRooms, amenities) => {
   try {
-    const res = await api.post(`/admin/hotel`, {
+    const res = await api.post(`/api/admin/hotel`, {
       hotelName,
       location,
       pricePerNight,
@@ -27,7 +32,7 @@ export const addhotel = async (hotelName, location, pricePerNight, availableRoom
 
 export const edithotel = async (id, hotelName, location, pricePerNight, availableRooms, amenities) => {
   try {
-    const res = await api.put(`/admin/hotel/${id}`, {
+    const res = await api.put(`/api/admin/hotel/${id}`, {
       hotelName,
       location,
       pricePerNight,

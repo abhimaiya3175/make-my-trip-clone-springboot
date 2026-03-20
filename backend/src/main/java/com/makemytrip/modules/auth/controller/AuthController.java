@@ -52,16 +52,22 @@ public class AuthController {
     }
 
     @PostMapping("/user/edit")
-    public ResponseEntity<User> editprofile(
+    public ResponseEntity<?> editprofile(
             @RequestParam String id,
             @RequestBody User updatedUser,
             Authentication authentication) {
-        String currentUserId = AuthContext.userId(authentication);
-        if (currentUserId == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        }
-        if (!id.equals(currentUserId) && !AuthContext.hasRole(authentication, "ADMIN")) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+
+        String authenticatedUserId = 
+            AuthContext.userId(authentication);
+
+        boolean isAdmin = authentication != null &&
+            authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+
+        if (!isAdmin && 
+            (authenticatedUserId == null || !authenticatedUserId.equals(id))) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body("You can only edit your own profile");
         }
 
         User updated = authService.editprofile(id, updatedUser);
