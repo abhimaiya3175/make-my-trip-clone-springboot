@@ -22,7 +22,10 @@ public class FlightStatusResponse {
     private LocalDateTime scheduledArrival;
     private LocalDateTime estimatedArrival;
     private FlightStatusEnum status;
+    private String statusMessage;
     private Integer delayMinutes;
     private String delayReason;
+    private Integer arrivalDelayMinutes;
+    private String estimatedArrivalUpdate;
     private LocalDateTime lastUpdated;
 }

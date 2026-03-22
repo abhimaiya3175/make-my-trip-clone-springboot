@@ -5,7 +5,7 @@
 export { login, signup, getuserbyemail, editprofile } from "@/services/authService";
 export { getflight, addflight, editflight, getFlightById } from "@/services/flightService";
 export { gethotel, addhotel, edithotel, getHotelById } from "@/services/hotelService";
-export { handleflightbooking, handlehotelbooking, getUserBookings, getBookingById, cancelBooking } from "@/services/bookingService";
+export { handleflightbooking, handlehotelbooking, getUserBookings, getBookingById, cancelBooking, createBooking, confirmPayment, getBookingPermissions, markReviewSubmitted } from "@/services/bookingService";
 export {
   getCancellationReasons,
   getRefundStatuses,

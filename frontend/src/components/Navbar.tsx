@@ -11,6 +11,7 @@ import {
   Armchair,
   BadgeIndianRupee,
   MessageSquareText,
+  ChevronRight,
 } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 import {
@@ -39,13 +40,10 @@ const Navbar = () => {
     router.push("/");
   };
 
-  const navLinks = [
+  const quickLinks = [
     { href: "/", label: "Home", icon: <Home className="w-4 h-4" /> },
     { href: "/flights", label: "Flights", icon: <Plane className="w-4 h-4" /> },
     { href: "/hotels", label: "Hotels", icon: <Building2 className="w-4 h-4" /> },
-  ];
-
-  const authNavLinks = [
     { href: "/bookings", label: "Bookings", icon: <ClipboardList className="w-4 h-4" /> },
     { href: "/seat-room", label: "Seat & Room", icon: <Armchair className="w-4 h-4" /> },
     { href: "/pricing", label: "Pricing", icon: <BadgeIndianRupee className="w-4 h-4" /> },
@@ -53,51 +51,20 @@ const Navbar = () => {
     { href: "/recommendations/suggestions", label: "Recommendations", icon: <Building2 className="w-4 h-4" /> },
     { href: "/reviews", label: "Reviews", icon: <MessageSquareText className="w-4 h-4" /> },
     { href: "/cancellations", label: "Cancellations", icon: <FileX2 className="w-4 h-4" /> },
-    { href: "/profile", label: "Profile", icon: <User className="w-4 h-4" /> },
   ];
 
   return (
-    <header className="bg-white shadow-sm backdrop-blur-md py-3 sticky top-0 z-50">
-      <div className="container mx-auto px-4 flex items-center justify-between">
-        {/* Logo */}
-        <Link href="/" className="flex items-center space-x-2 cursor-pointer">
-          <Plane className="w-8 h-8 text-red-500" />
-          <span className="text-2xl font-bold text-black">MakeMyTour</span>
-        </Link>
+    <header className="bg-white/95 backdrop-blur-md sticky top-0 z-50 border-b border-gray-100">
+      <div className="container mx-auto px-4 py-3">
+        <div className="flex items-center justify-between">
+          {/* Logo */}
+          <Link href="/" className="flex items-center space-x-2 cursor-pointer">
+            <Plane className="w-8 h-8 text-red-500" />
+            <span className="text-2xl font-bold text-black">MakeMyTour</span>
+          </Link>
 
-        {/* Center Navigation Links */}
-        <nav className="hidden md:flex items-center space-x-1">
-          {navLinks.map((link) => (
-            <Link
-              key={link.label}
-              href={link.href}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${router.pathname === link.href
-                  ? "text-red-600 bg-red-50"
-                  : "text-gray-600 hover:text-red-600 hover:bg-gray-50"
-                }`}
-            >
-              {link.icon}
-              {link.label}
-            </Link>
-          ))}
-          {user &&
-            authNavLinks.map((link) => (
-              <Link
-                key={link.label}
-                href={link.href}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${router.pathname === link.href
-                    ? "text-red-600 bg-red-50"
-                    : "text-gray-600 hover:text-red-600 hover:bg-gray-50"
-                  }`}
-              >
-                {link.icon}
-                {link.label}
-              </Link>
-            ))}
-        </nav>
-
-        {/* Right section */}
-        <div className="flex items-center space-x-3">
+          {/* Right section */}
+          <div className="flex items-center space-x-3">
           {user ? (
             <>
               {user.role === "ADMIN" && (
@@ -131,6 +98,17 @@ const Navbar = () => {
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
+                  <DropdownMenuLabel className="text-[11px] uppercase tracking-wide text-gray-400">
+                    Quick Links
+                  </DropdownMenuLabel>
+                  {quickLinks.map((link) => (
+                    <DropdownMenuItem key={link.href + link.label} onClick={() => router.push(link.href)}>
+                      {link.icon}
+                      <span>{link.label}</span>
+                      <ChevronRight className="ml-auto h-3.5 w-3.5 text-gray-400" />
+                    </DropdownMenuItem>
+                  ))}
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => router.push("/profile")}>
                     <User className="mr-2 h-4 w-4" />
                     <span>Profile</span>
@@ -159,7 +137,9 @@ const Navbar = () => {
               }
             />
           )}
+          </div>
         </div>
+
       </div>
     </header>
   );

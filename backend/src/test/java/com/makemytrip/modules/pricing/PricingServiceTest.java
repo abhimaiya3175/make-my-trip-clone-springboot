@@ -21,10 +21,12 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -33,6 +35,8 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 @SuppressWarnings("null")
 class PricingServiceTest {
+
+    private static final Set<String> FIXED_HOLIDAYS_MM_DD = Set.of("12-25", "01-01", "01-26", "08-15", "10-02");
 
     @Mock private PricingRuleRepository ruleRepository;
     @Mock private PriceSnapshotRepository snapshotRepository;
@@ -57,14 +61,27 @@ class PricingServiceTest {
         return h;
     }
 
+    private LocalDate stableWeekdayDate() {
+        LocalDate candidate = LocalDate.now().plusDays(10);
+        for (int i = 0; i < 30; i++) {
+            String mmdd = String.format("%02d-%02d", candidate.getMonthValue(), candidate.getDayOfMonth());
+            boolean weekend = candidate.getDayOfWeek().getValue() >= 6;
+            if (!weekend && !FIXED_HOLIDAYS_MM_DD.contains(mmdd)) {
+                return candidate;
+            }
+            candidate = candidate.plusDays(1);
+        }
+        return LocalDate.now().plusDays(14);
+    }
+
     // ── calculatePrice ───────────────────────────────────────────────
 
     @Test
     void calculatePrice_noRules_returnsBasePrice() {
         when(flightRepository.findById("fl-1")).thenReturn(Optional.of(flight("fl-1", 5000, 50)));
-        when(ruleRepository.findByActiveTrue()).thenReturn(Collections.emptyList());
+        LocalDate travelDate = stableWeekdayDate();
 
-        PriceResponse result = service.calculatePrice("fl-1", "FLIGHT", null);
+        PriceResponse result = service.calculatePrice("fl-1", "FLIGHT", null, travelDate);
 
         assertThat(result.getBasePrice()).isEqualTo(5000.0);
         assertThat(result.getFinalPrice()).isEqualTo(5000.0);
@@ -73,40 +90,34 @@ class PricingServiceTest {
     }
 
     @Test
-    void calculatePrice_withHighDemandRule_appliesMultiplier() {
-        when(flightRepository.findById("fl-1")).thenReturn(Optional.of(flight("fl-1", 5000, 10))); // <30 seats = 85% occupancy
-        PricingRule rule = PricingRule.builder()
-                .name("High Demand").ruleType(PricingRule.RuleType.HIGH_DEMAND)
-                .multiplier(1.25).demandThreshold(80.0).active(true).build();
-        when(ruleRepository.findByActiveTrue()).thenReturn(List.of(rule));
+    void calculatePrice_highOccupancy_increasesPrice() {
+        when(flightRepository.findById("fl-1")).thenReturn(Optional.of(flight("fl-1", 5000, 10)));
+        LocalDate travelDate = stableWeekdayDate();
 
-        PriceResponse result = service.calculatePrice("fl-1", "FLIGHT", null);
+        PriceResponse result = service.calculatePrice("fl-1", "FLIGHT", null, travelDate);
 
-        assertThat(result.getTotalMultiplier()).isEqualTo(1.25);
-        assertThat(result.getFinalPrice()).isEqualTo(6250.0);
-        assertThat(result.getAppliedRules()).contains("High Demand");
+        assertThat(result.getTotalMultiplier()).isGreaterThan(1.0);
+        assertThat(result.getFinalPrice()).isGreaterThan(5000.0);
+        assertThat(result.getAppliedRules()).isNotEmpty();
     }
 
     @Test
-    void calculatePrice_entityTypeMismatch_skipsRule() {
-        when(flightRepository.findById("fl-1")).thenReturn(Optional.of(flight("fl-1", 5000, 50)));
-        PricingRule rule = PricingRule.builder()
-                .name("Hotel Only").ruleType(PricingRule.RuleType.LAST_MINUTE)
-                .multiplier(1.20).bookingWindowDaysMax(3).entityType("HOTEL").active(true).build();
-        when(ruleRepository.findByActiveTrue()).thenReturn(List.of(rule));
+    void calculatePrice_nearDepartureLowOccupancy_decreasesPrice() {
+        when(flightRepository.findById("fl-1")).thenReturn(Optional.of(flight("fl-1", 5000, 95)));
+        LocalDate travelDate = LocalDate.now().plusDays(1);
 
-        PriceResponse result = service.calculatePrice("fl-1", "FLIGHT", null);
+        PriceResponse result = service.calculatePrice("fl-1", "FLIGHT", null, travelDate);
 
-        assertThat(result.getTotalMultiplier()).isEqualTo(1.0);
-        assertThat(result.getAppliedRules()).isEmpty();
+        assertThat(result.getTotalMultiplier()).isLessThan(1.0);
+        assertThat(result.getFinalPrice()).isLessThan(5000.0);
+        assertThat(result.getAppliedRules()).contains("Near-Departure Empty Seat Discount");
     }
 
     @Test
     void calculatePrice_fallsBackToDefaultPrice_whenNotFound() {
         when(flightRepository.findById("unknown")).thenReturn(Optional.empty());
-        when(ruleRepository.findByActiveTrue()).thenReturn(Collections.emptyList());
 
-        PriceResponse result = service.calculatePrice("unknown", "FLIGHT", null);
+        PriceResponse result = service.calculatePrice("unknown", "FLIGHT", null, stableWeekdayDate());
 
         assertThat(result.getBasePrice()).isEqualTo(5000.0); // default fallback
     }
@@ -114,9 +125,9 @@ class PricingServiceTest {
     @Test
     void calculatePrice_hotel_usesHotelRepo() {
         when(hotelRepository.findById("h-1")).thenReturn(Optional.of(hotel("h-1", 3500, 20)));
-        when(ruleRepository.findByActiveTrue()).thenReturn(Collections.emptyList());
+        LocalDate travelDate = stableWeekdayDate();
 
-        PriceResponse result = service.calculatePrice("h-1", "HOTEL", null);
+        PriceResponse result = service.calculatePrice("h-1", "HOTEL", null, travelDate);
 
         assertThat(result.getBasePrice()).isEqualTo(3500.0);
     }
@@ -124,7 +135,6 @@ class PricingServiceTest {
     @Test
     void calculatePrice_attachesFreezeInfo() {
         when(flightRepository.findById("fl-1")).thenReturn(Optional.of(flight("fl-1", 5000, 50)));
-        when(ruleRepository.findByActiveTrue()).thenReturn(Collections.emptyList());
 
         PriceFreeze freeze = PriceFreeze.builder()
                 .userId("u1").entityId("fl-1").entityType("FLIGHT")
@@ -133,7 +143,7 @@ class PricingServiceTest {
         when(freezeRepository.findByUserIdAndEntityIdAndUsedFalse("u1", "fl-1"))
                 .thenReturn(Optional.of(freeze));
 
-        PriceResponse result = service.calculatePrice("fl-1", "FLIGHT", "u1");
+        PriceResponse result = service.calculatePrice("fl-1", "FLIGHT", "u1", stableWeekdayDate());
 
         assertThat(result.getFrozenPrice()).isEqualTo(4800.0);
         assertThat(result.getFreezeExpiresAt()).isNotNull();
@@ -146,7 +156,6 @@ class PricingServiceTest {
         when(freezeRepository.findByUserIdAndEntityIdAndUsedFalse("u1", "fl-1"))
                 .thenReturn(Optional.empty());
         when(flightRepository.findById("fl-1")).thenReturn(Optional.of(flight("fl-1", 5000, 50)));
-        when(ruleRepository.findByActiveTrue()).thenReturn(Collections.emptyList());
         when(freezeRepository.save(any(PriceFreeze.class))).thenAnswer(i -> {
             PriceFreeze f = i.getArgument(0);
             f.setId("frz-1");
@@ -157,10 +166,11 @@ class PricingServiceTest {
         req.setUserId("u1");
         req.setEntityId("fl-1");
         req.setEntityType("FLIGHT");
+        req.setTravelDate(LocalDate.now().plusDays(2));
 
         FreezeResponse result = service.freezePrice(req);
 
-        assertThat(result.getFrozenPrice()).isEqualTo(5000.0);
+        assertThat(result.getFrozenPrice()).isGreaterThan(0.0);
         assertThat(result.isActive()).isTrue();
     }
 
@@ -178,11 +188,28 @@ class PricingServiceTest {
         req.setUserId("u1");
         req.setEntityId("fl-1");
         req.setEntityType("FLIGHT");
+        req.setTravelDate(LocalDate.now().plusDays(2));
 
         assertThatThrownBy(() -> service.freezePrice(req))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("already have an active");
     }
+
+        @Test
+        void freezePrice_moreThanSevenDaysBeforeDeparture_rejected() {
+        when(freezeRepository.findByUserIdAndEntityIdAndUsedFalse("u1", "fl-1"))
+            .thenReturn(Optional.empty());
+
+        FreezeRequest req = new FreezeRequest();
+        req.setUserId("u1");
+        req.setEntityId("fl-1");
+        req.setEntityType("FLIGHT");
+        req.setTravelDate(LocalDate.now().plusDays(10));
+
+        assertThatThrownBy(() -> service.freezePrice(req))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("within 7 days");
+        }
 
     // ── getHistory ───────────────────────────────────────────────────
 

@@ -30,7 +30,9 @@ public class Booking {
     
     // Date fields
     private LocalDate bookingDate;   // When booking was created
-    private LocalDate travelDate;    // When travel/stay begins
+    private LocalDate travelDate;    // When travel/stay begins (check-in date for hotels)
+    private int numberOfNights;      // Number of nights for hotel bookings
+    private LocalDate checkOutDate;  // Auto-calculated check-out date (travelDate + numberOfNights)
     
     // Status fields
     @Indexed
@@ -144,6 +146,26 @@ public class Booking {
 
     public void setTravelDate(LocalDate travelDate) {
         this.travelDate = travelDate;
+    }
+
+    public int getNumberOfNights() {
+        return numberOfNights;
+    }
+
+    public void setNumberOfNights(int numberOfNights) {
+        this.numberOfNights = numberOfNights;
+        // Auto-calculate checkout date
+        if (this.travelDate != null && numberOfNights > 0) {
+            this.checkOutDate = this.travelDate.plusDays(numberOfNights);
+        }
+    }
+
+    public LocalDate getCheckOutDate() {
+        return checkOutDate;
+    }
+
+    public void setCheckOutDate(LocalDate checkOutDate) {
+        this.checkOutDate = checkOutDate;
     }
 
     public BookingStatus getBookingStatus() {

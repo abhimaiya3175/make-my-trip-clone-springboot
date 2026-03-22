@@ -5,9 +5,6 @@ import org.springframework.data.mongodb.core.mapping.Document;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-import java.util.List;
-import java.util.ArrayList;
-
 @Document(collection = "users")
 public class User {
     @Id
@@ -19,7 +16,6 @@ public class User {
     private String password;
     private String role;
     private String phoneNumber;
-    private List<com.makemytrip.modules.booking.model.Booking> bookings = new ArrayList<>();
 
     public String getFirstName() {return firstName;}
     public String getId() {
@@ -48,6 +44,4 @@ public class User {
     @JsonProperty
     public void setPassword(String password) {this.password = password;}
     public void setRole(String role) {this.role = role;}
-    public List<com.makemytrip.modules.booking.model.Booking> getBookings(){return bookings;}
-    public void setBookings(List<com.makemytrip.modules.booking.model.Booking> bookings){this.bookings=bookings;}
 }

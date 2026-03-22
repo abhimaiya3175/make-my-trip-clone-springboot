@@ -1,19 +1,8 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Button } from "../ui/button";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
-
-const buildAuthHeaders = () => {
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (typeof window !== "undefined") {
-    const token = localStorage.getItem("authToken");
-    if (token) {
-      headers.Authorization = `Bearer ${token}`;
-    }
-  }
-  return headers;
-};
+import api from "@/utils/api";
+import { getErrorMessage } from "@/utils/requestState";
 
 interface SeatResponse {
   id: string;
@@ -49,15 +38,13 @@ const SeatMap: React.FC<SeatMapProps> = ({ flightId, userId, requiredSeats = 1, 
     setLoading(true);
     setError(null);
     try {
-      const url = `${API_BASE}/api/seatroom/seats/flight/${flightId}${userId ? `?userId=${userId}` : ""}`;
-      const res = await fetch(url);
-      if (res.ok) {
-        const json = await res.json();
-        setSeats(json.data || []);
-      }
+      const res = await api.get(`/api/seatroom/seats/flight/${flightId}`, {
+        params: userId ? { userId } : undefined,
+      });
+      setSeats(res.data?.data || []);
     } catch (err) {
       console.error("Failed to fetch seats:", err);
-      setError("Failed to load seat map");
+      setError(getErrorMessage(err, "Failed to load seat map"));
     } finally {
       setLoading(false);
     }
@@ -89,32 +76,19 @@ const SeatMap: React.FC<SeatMapProps> = ({ flightId, userId, requiredSeats = 1, 
       // Select new seat
       setActionLoading(true);
       try {
-        const res = await fetch(`${API_BASE}/api/seatroom/seats/${seat.id}/lock`, {
-          method: "POST",
-          headers: buildAuthHeaders(),
-          body: JSON.stringify({ userId }),
+        const res = await api.post(`/api/seatroom/seats/${seat.id}/lock`, { userId });
+        const lockedSeat = res.data?.data as SeatResponse | undefined;
+        setSelectedSeatIds((prev) => {
+          const next = [...prev, seat.id];
+          const selected = next
+            .map((id) => (id === seat.id ? lockedSeat || seats.find((s) => s.id === id) : seats.find((s) => s.id === id)))
+            .filter(Boolean) as SeatResponse[];
+          onSeatSelect?.(selected);
+          return next;
         });
-        const json = await res.json();
-        if (res.ok) {
-          const lockedSeat = json?.data as SeatResponse | undefined;
-          setSelectedSeatIds((prev) => {
-            const next = [...prev, seat.id];
-            const selected = next
-              .map((id) => (id === seat.id ? lockedSeat || seats.find((s) => s.id === id) : seats.find((s) => s.id === id)))
-              .filter(Boolean) as SeatResponse[];
-            onSeatSelect?.(selected);
-            return next;
-          });
-          await fetchSeats();
-        } else {
-          if (res.status === 401) {
-            setError("Please log in again to lock seats.");
-          } else {
-            setError(json.error?.message || "Failed to lock seat");
-          }
-        }
+        await fetchSeats();
       } catch (err) {
-        setError("Failed to lock seat");
+        setError(getErrorMessage(err, "Failed to lock seat"));
       } finally {
         setActionLoading(false);
       }
@@ -124,11 +98,7 @@ const SeatMap: React.FC<SeatMapProps> = ({ flightId, userId, requiredSeats = 1, 
   const releaseSeat = async (seatId: string) => {
     if (!userId) return;
     try {
-      await fetch(`${API_BASE}/api/seatroom/seats/${seatId}/release`, {
-        method: "POST",
-        headers: buildAuthHeaders(),
-        body: JSON.stringify({ userId }),
-      });
+      await api.post(`/api/seatroom/seats/${seatId}/release`, { userId });
     } catch (err) {
       console.error("Failed to release seat:", err);
     }
@@ -143,35 +113,19 @@ const SeatMap: React.FC<SeatMapProps> = ({ flightId, userId, requiredSeats = 1, 
       // Confirm all selected seats
       const confirmResponses = await Promise.all(
         selectedSeatIds.map(seatId =>
-          fetch(`${API_BASE}/api/seatroom/seats/${seatId}/confirm`, {
-            method: "POST",
-            headers: buildAuthHeaders(),
-            body: JSON.stringify({ userId }),
-          })
+          api.post(`/api/seatroom/seats/${seatId}/confirm`, { userId })
         )
       );
 
-      const allSuccessful = confirmResponses.every(res => res.ok);
-      
-      if (allSuccessful) {
-        const confirmedPayloads = await Promise.all(confirmResponses.map((res) => res.json()));
-        const confirmedSeats = confirmedPayloads
-          .map((payload) => payload?.data as SeatResponse | undefined)
-          .filter(Boolean) as SeatResponse[];
-        
-        onSeatConfirm?.(confirmedSeats);
-        setSelectedSeatIds([]);
-        await fetchSeats();
-      } else {
-        const failedResponse = confirmResponses.find(res => !res.ok);
-        if (failedResponse?.status === 401) {
-          setError("Please log in again to confirm seats.");
-        } else {
-          setError("Failed to confirm one or more seats");
-        }
-      }
+      const confirmedSeats = confirmResponses
+        .map((res) => res.data?.data as SeatResponse | undefined)
+        .filter(Boolean) as SeatResponse[];
+
+      onSeatConfirm?.(confirmedSeats);
+      setSelectedSeatIds([]);
+      await fetchSeats();
     } catch (err) {
-      setError("Failed to confirm seat bookings");
+      setError(getErrorMessage(err, "Failed to confirm seat bookings"));
     } finally {
       setActionLoading(false);
     }

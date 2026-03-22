@@ -10,6 +10,8 @@ import com.makemytrip.modules.flights.model.Flight;
 import com.makemytrip.modules.flights.repository.FlightRepository;
 import com.makemytrip.modules.hotels.model.Hotel;
 import com.makemytrip.modules.hotels.repository.HotelRepository;
+import com.makemytrip.modules.seatroom.model.Room;
+import com.makemytrip.modules.seatroom.repository.RoomRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,6 +19,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -39,6 +42,12 @@ public class BookingService {
     @Autowired
     private BookingRepository bookingRepository;
 
+    @Autowired
+    private RoomRepository roomRepository;
+
+    @Autowired
+    private com.makemytrip.modules.seatroom.service.SeatRoomService seatRoomService;
+
     /**
      * Create a new booking with date-based validation
      */
@@ -51,6 +60,11 @@ public class BookingService {
             throw new IllegalArgumentException("Travel date must be in the future");
         }
 
+        // Validate numberOfNights for hotel bookings
+        if (request.getEntityType() == EntityType.HOTEL && request.getNumberOfNights() <= 0) {
+            throw new IllegalArgumentException("Number of nights must be at least 1 for hotel bookings");
+        }
+
         Booking booking = new Booking();
         booking.setUserId(request.getUserId());
         booking.setUserName(request.getUserName());
@@ -60,6 +74,12 @@ public class BookingService {
         booking.setTotalPrice(request.getTotalPrice());
         booking.setBookingDate(LocalDate.now());
         booking.setTravelDate(request.getTravelDate());
+        
+        // Set numberOfNights for hotel bookings (this also calculates checkOutDate)
+        if (request.getEntityType() == EntityType.HOTEL) {
+            booking.setNumberOfNights(request.getNumberOfNights());
+        }
+        
         booking.setBookingStatus(BookingStatus.PENDING);
         booking.setPaymentStatus(PaymentStatus.PENDING);
         booking.setCancellationAllowed(true);
@@ -76,7 +96,7 @@ public class BookingService {
         if (bookingOpt.isPresent()) {
             Booking booking = bookingOpt.get();
             updateBookingBasedOnDate(booking);
-            return Optional.of(bookingRepository.save(booking));
+            return Optional.of(booking);
         }
         return bookingOpt;
     }
@@ -87,7 +107,7 @@ public class BookingService {
     public List<Booking> getUserBookings(String userId) {
         List<Booking> bookings = bookingRepository.findByUserId(userId);
         bookings.forEach(this::updateBookingBasedOnDate);
-        return bookingRepository.saveAll(bookings);
+        return bookings;
     }
 
     /**
@@ -222,6 +242,11 @@ public class BookingService {
             );
         }
 
+        boolean hotelBooking = booking.getEntityType() == EntityType.HOTEL;
+        List<String> allocatedRoomIds = booking.getSeatNumbers() != null
+            ? new ArrayList<>(booking.getSeatNumbers())
+            : List.of();
+
         booking.setBookingStatus(BookingStatus.CANCELLED);
         booking.setCancellationAllowed(false);
         booking.setCancelledAt(LocalDateTime.now());
@@ -231,6 +256,18 @@ public class BookingService {
         // Update payment status to refunded (if it was paid)
         if (booking.getPaymentStatus() == PaymentStatus.PAID) {
             booking.setPaymentStatus(PaymentStatus.REFUNDED);
+        }
+
+        // Unblock allocated hotel rooms if available on booking metadata.
+        if (hotelBooking && booking.getTravelDate() != null && booking.getCheckOutDate() != null && !allocatedRoomIds.isEmpty()) {
+            try {
+                for (String roomId : allocatedRoomIds) {
+                    seatRoomService.unblockRoomDates(roomId, booking.getTravelDate(), booking.getCheckOutDate(), bookingId);
+                }
+                log.info("Unblocked {} room(s) for cancelled booking {}", allocatedRoomIds.size(), bookingId);
+            } catch (Exception e) {
+                log.warn("Failed to unblock room dates for booking {}: {}", bookingId, e.getMessage());
+            }
         }
 
         log.info("Booking {} cancelled by user {}. Reason: {}", bookingId, userId, reason);
@@ -271,25 +308,83 @@ public class BookingService {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new IllegalArgumentException("Booking not found"));
 
+        if (booking.getPaymentStatus() == PaymentStatus.PAID
+                && booking.getBookingStatus() == BookingStatus.CONFIRMED) {
+            return booking;
+        }
+
+        if (booking.getPaymentStatus() != PaymentStatus.PENDING) {
+            throw new IllegalStateException("Payment cannot be confirmed from status: " + booking.getPaymentStatus());
+        }
+
         if (!booking.isBeforeTravelDate()) {
             throw new IllegalStateException("Cannot pay for a booking after travel date");
+        }
+
+        if (booking.getEntityType() == EntityType.HOTEL) {
+            allocateAndBlockHotelRooms(booking);
         }
 
         booking.setPaymentStatus(PaymentStatus.PAID);
         booking.setBookingStatus(BookingStatus.CONFIRMED);
         booking.setUpdatedAt(LocalDateTime.now());
 
+        Booking savedBooking = bookingRepository.save(booking);
+
         log.info("Payment confirmed for booking {}", bookingId);
-        return bookingRepository.save(booking);
+        return savedBooking;
+    }
+
+    private void allocateAndBlockHotelRooms(Booking booking) {
+        if (booking.getTravelDate() == null || booking.getCheckOutDate() == null) {
+            throw new IllegalStateException("Hotel booking requires valid check-in and check-out dates");
+        }
+
+        int roomsRequested = Math.max(1, booking.getQuantity());
+        List<Room> rooms = roomRepository.findByHotelIdAndAvailable(booking.getEntityId(), true);
+
+        List<String> selectedRoomIds = new ArrayList<>();
+        for (Room room : rooms) {
+            if (selectedRoomIds.size() >= roomsRequested) {
+                break;
+            }
+            if (seatRoomService.isRoomAvailableForDateRange(room.getId(), booking.getTravelDate(), booking.getCheckOutDate())) {
+                selectedRoomIds.add(room.getId());
+            }
+        }
+
+        if (selectedRoomIds.size() < roomsRequested) {
+            throw new IllegalStateException("Not enough rooms available for selected dates");
+        }
+
+        List<String> blockedRoomIds = new ArrayList<>();
+        try {
+            for (String roomId : selectedRoomIds) {
+                seatRoomService.blockRoomDates(roomId, booking.getTravelDate(), booking.getCheckOutDate(), booking.getId());
+                blockedRoomIds.add(roomId);
+            }
+            booking.setSeatNumbers(selectedRoomIds);
+        } catch (Exception e) {
+            for (String roomId : blockedRoomIds) {
+                try {
+                    seatRoomService.unblockRoomDates(roomId, booking.getTravelDate(), booking.getCheckOutDate(), booking.getId());
+                } catch (Exception rollbackError) {
+                    log.warn("Failed to rollback blocked room {} for booking {}: {}",
+                            roomId, booking.getId(), rollbackError.getMessage());
+                }
+            }
+            throw new IllegalStateException("Failed to reserve rooms for booking", e);
+        }
     }
 
     // ========== Legacy Methods (for backward compatibility) ==========
 
+    // TODO: Remove legacy method after all callers migrate to createBooking().
     public Booking bookFlight(String userId, String flightId, int seats, double price, String date, String seatNumbers) {
         Optional<User> usersOptional = userRepository.findById(userId);
         Optional<Flight> flightOptional = flightRepository.findById(flightId);
-        if (usersOptional.isPresent() && flightOptional.isPresent()) {
-            User user = usersOptional.get();
+        if (flightOptional.isPresent()) {
+            User user = usersOptional.orElse(null);
             Flight flight = flightOptional.get();
             if (flight.getAvailableSeats() >= seats) {
                 flight.setAvailableSeats(flight.getAvailableSeats() - seats);
@@ -299,7 +394,9 @@ public class BookingService {
                 booking.setType("Flight");
                 booking.setBookingId(flightId);
                 booking.setUserId(userId);
-                booking.setUserName(user.getFirstName() + " " + user.getLastName());
+                booking.setUserName(user != null
+                    ? (user.getFirstName() + " " + user.getLastName())
+                    : "Guest User");
                 booking.setEntityType(EntityType.FLIGHT);
                 booking.setEntityId(flightId);
                 
@@ -328,23 +425,20 @@ public class BookingService {
                 // Save to new bookings collection
                 Booking savedBooking = bookingRepository.save(booking);
                 
-                // Also add to user's embedded bookings for backward compatibility
-                user.getBookings().add(booking);
-                userRepository.save(user);
-                
                 return savedBooking;
             } else {
                 throw new RuntimeException("Not enough seats available");
             }
         }
-        throw new RuntimeException("User or flight not found");
+        throw new RuntimeException("Flight not found");
     }
 
-    public Booking bookhotel(String userId, String hotelId, int rooms, double price, String date) {
+    // TODO: Remove legacy method after all callers migrate to createBooking().
+    public Booking bookhotel(String userId, String hotelId, int rooms, double price, String date, String roomNumbers) {
         Optional<User> usersOptional = userRepository.findById(userId);
         Optional<Hotel> hotelOptional = hotelRepository.findById(hotelId);
-        if (usersOptional.isPresent() && hotelOptional.isPresent()) {
-            User user = usersOptional.get();
+        if (hotelOptional.isPresent()) {
+            User user = usersOptional.orElse(null);
             Hotel hotel = hotelOptional.get();
             if (hotel.getAvailableRooms() >= rooms) {
                 hotel.setAvailableRooms(hotel.getAvailableRooms() - rooms);
@@ -354,7 +448,9 @@ public class BookingService {
                 booking.setType("Hotel");
                 booking.setBookingId(hotelId);
                 booking.setUserId(userId);
-                booking.setUserName(user.getFirstName() + " " + user.getLastName());
+                booking.setUserName(user != null
+                    ? (user.getFirstName() + " " + user.getLastName())
+                    : "Guest User");
                 booking.setEntityType(EntityType.HOTEL);
                 booking.setEntityId(hotelId);
                 
@@ -365,6 +461,12 @@ public class BookingService {
                 }
                 
                 booking.setQuantity(rooms);
+                if (roomNumbers != null && !roomNumbers.isBlank()) {
+                    booking.setSeatNumbers(Arrays.stream(roomNumbers.split(","))
+                        .map(String::trim)
+                        .filter(s -> !s.isEmpty())
+                        .collect(Collectors.toList()));
+                }
                 booking.setTotalPrice(price);
                 booking.setBookingStatus(BookingStatus.CONFIRMED);
                 booking.setPaymentStatus(PaymentStatus.PAID);
@@ -372,15 +474,11 @@ public class BookingService {
                 // Save to new bookings collection
                 Booking savedBooking = bookingRepository.save(booking);
                 
-                // Also add to user's embedded bookings for backward compatibility
-                user.getBookings().add(booking);
-                userRepository.save(user);
-                
                 return savedBooking;
             } else {
                 throw new RuntimeException("Not enough rooms available");
             }
         }
-        throw new RuntimeException("User or hotel not found");
+        throw new RuntimeException("Hotel not found");
     }
 }

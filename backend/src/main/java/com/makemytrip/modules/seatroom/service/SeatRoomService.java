@@ -16,9 +16,11 @@ import org.springframework.stereotype.Service;
 import jakarta.annotation.PostConstruct;
 import java.io.IOException;
 import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.HashMap;
 
 @Slf4j
 @Service
@@ -417,6 +419,94 @@ public class SeatRoomService {
             throw new ConflictException("Room was modified concurrently, please retry");
         }
         return mapRoomResponse(room, userId);
+    }
+
+    /**
+     * Block room dates for a booking (called when booking is confirmed)
+     */
+    public void blockRoomDates(String roomId, LocalDate checkInDate, LocalDate checkOutDate, String bookingId) {
+        Room room = roomRepository.findById(roomId)
+                .orElseThrow(() -> new ResourceNotFoundException("Room not found: " + roomId));
+
+        if (room.getBlockedDates() == null) {
+            room.setBlockedDates(new ArrayList<>());
+        }
+        if (room.getDateBookingMap() == null) {
+            room.setDateBookingMap(new HashMap<>());
+        }
+
+        // Block all dates from checkInDate (inclusive) to checkOutDate (exclusive)
+        LocalDate currentDate = checkInDate;
+        while (currentDate.isBefore(checkOutDate)) {
+            if (!room.getBlockedDates().contains(currentDate)) {
+                room.getBlockedDates().add(currentDate);
+                room.getDateBookingMap().put(currentDate.toString(), bookingId);
+            }
+            currentDate = currentDate.plusDays(1);
+        }
+
+        try {
+            roomRepository.save(room);
+            log.info("Blocked room {} from {} to {} for booking {}", 
+                    roomId, checkInDate, checkOutDate, bookingId);
+        } catch (OptimisticLockingFailureException e) {
+            throw new ConflictException("Room was modified concurrently, please retry");
+        }
+    }
+
+    /**
+     * Unblock room dates (called when booking is cancelled)
+     */
+    public void unblockRoomDates(String roomId, LocalDate checkInDate, LocalDate checkOutDate, String bookingId) {
+        Room room = roomRepository.findById(roomId)
+                .orElseThrow(() -> new ResourceNotFoundException("Room not found: " + roomId));
+
+        if (room.getBlockedDates() == null || room.getDateBookingMap() == null) {
+            return; // Already unblocked
+        }
+
+        // Unblock all dates from checkInDate (inclusive) to checkOutDate (exclusive)
+        LocalDate currentDate = checkInDate;
+        while (currentDate.isBefore(checkOutDate)) {
+            String dateStr = currentDate.toString();
+            // Only remove if it was blocked by this booking
+            if (bookingId.equals(room.getDateBookingMap().get(dateStr))) {
+                room.getBlockedDates().remove(currentDate);
+                room.getDateBookingMap().remove(dateStr);
+            }
+            currentDate = currentDate.plusDays(1);
+        }
+
+        try {
+            roomRepository.save(room);
+            log.info("Unblocked room {} from {} to {} for booking {}", 
+                    roomId, checkInDate, checkOutDate, bookingId);
+        } catch (OptimisticLockingFailureException e) {
+            throw new ConflictException("Room was modified concurrently, please retry");
+        }
+    }
+
+    /**
+     * Check if room is available for date range (not considering temporary locks)
+     */
+    public boolean isRoomAvailableForDateRange(String roomId, LocalDate checkInDate, LocalDate checkOutDate) {
+        Room room = roomRepository.findById(roomId)
+                .orElseThrow(() -> new ResourceNotFoundException("Room not found: " + roomId));
+
+        if (room.getBlockedDates() == null || room.getBlockedDates().isEmpty()) {
+            return true;
+        }
+
+        // Check if any date in range is blocked
+        LocalDate currentDate = checkInDate;
+        while (currentDate.isBefore(checkOutDate)) {
+            if (room.getBlockedDates().contains(currentDate)) {
+                return false;
+            }
+            currentDate = currentDate.plusDays(1);
+        }
+
+        return true;
     }
 
     // ── User preferences ─────────────────────────────────────────────

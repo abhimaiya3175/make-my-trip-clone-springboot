@@ -8,6 +8,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface ReviewRepository extends MongoRepository<Review, String> {
     // Legacy methods
@@ -19,6 +20,8 @@ public interface ReviewRepository extends MongoRepository<Review, String> {
         EntityType entityType, String entityId, ModerationStatus status, Pageable pageable);
     
     List<Review> findByEntityTypeAndEntityId(EntityType entityType, String entityId);
+
+    Optional<Review> findByUserIdAndEntityTypeAndEntityId(String userId, EntityType entityType, String entityId);
     
     boolean existsByUserIdAndEntityTypeAndEntityId(String userId, EntityType entityType, String entityId);
     

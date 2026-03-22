@@ -28,27 +28,51 @@ const RecommendationCard: React.FC<RecommendationCardProps> = ({
   const [explanation, setExplanation] = useState<string | null>(null);
   const [loadingExplain, setLoadingExplain] = useState(false);
   const [feedbackSent, setFeedbackSent] = useState<string | null>(null);
+  const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
+  const [feedbackError, setFeedbackError] = useState<string | null>(null);
+  const [showWhyTooltip, setShowWhyTooltip] = useState(false);
 
   const fetchExplanation = async () => {
     if (explanation) {
-      setExplanation(null);
+      setShowWhyTooltip((prev) => !prev);
       return;
     }
     setLoadingExplain(true);
     try {
+      if (userId && userId !== "guest") {
+        await api.post("/api/recommendations/events", {
+          userId,
+          eventType: "CLICK",
+          entityId: recommendation.itemId,
+          entityType: recommendation.itemType,
+          metadata: "action:why_this",
+        });
+      }
       const res = await api.get(
         `/api/recommendations/${recommendation.itemId}/explain`,
         { params: { userId } }
       );
       setExplanation(res.data?.data?.explanation || "No details available.");
+      setShowWhyTooltip(true);
     } catch {
       setExplanation("Could not load explanation.");
+      setShowWhyTooltip(true);
     } finally {
       setLoadingExplain(false);
     }
   };
 
   const sendFeedback = async (type: "LIKE" | "SAVE" | "NOT_INTERESTED") => {
+    if (feedbackSubmitting) {
+      return;
+    }
+
+    const previousFeedback = feedbackSent;
+    setFeedbackError(null);
+    setFeedbackSubmitting(true);
+    // Optimistic UI: acknowledge click immediately.
+    setFeedbackSent(type);
+
     try {
       await api.post(`/api/recommendations/feedback`, {
           userId,
@@ -56,10 +80,12 @@ const RecommendationCard: React.FC<RecommendationCardProps> = ({
           itemType: recommendation.itemType,
           feedbackType: type,
       });
-      setFeedbackSent(type);
-      onFeedback?.();
+      await onFeedback?.();
     } catch {
-      // silently ignore
+      setFeedbackSent(previousFeedback);
+      setFeedbackError("Could not save feedback. Please try again.");
+    } finally {
+      setFeedbackSubmitting(false);
     }
   };
 
@@ -124,27 +150,39 @@ const RecommendationCard: React.FC<RecommendationCardProps> = ({
           </div>
         </div>
 
-        {/* Explanation toggle */}
-        <button
-          onClick={fetchExplanation}
-          className="text-xs text-blue-600 hover:underline mt-2"
-          disabled={loadingExplain}
-        >
-          {loadingExplain
-            ? "Loading..."
-            : explanation
-            ? "Hide details"
-            : "Why this?"}
-        </button>
-        {explanation && (
-          <p className="text-xs text-gray-500 mt-1 italic">{explanation}</p>
-        )}
+        {/* Explanation tooltip */}
+        <div className="relative mt-2 inline-block">
+          <button
+            onClick={fetchExplanation}
+            className="text-xs text-blue-600 hover:underline"
+            disabled={loadingExplain}
+            aria-describedby={`why-tooltip-${recommendation.id}`}
+          >
+            {loadingExplain ? "Loading..." : "Why this recommendation?"}
+          </button>
+          {showWhyTooltip && explanation && (
+            <div
+              id={`why-tooltip-${recommendation.id}`}
+              role="tooltip"
+              className="absolute left-0 z-10 mt-2 w-72 rounded-md border border-gray-200 bg-white p-3 text-xs text-gray-600 shadow-lg"
+            >
+              <p>{explanation}</p>
+              <button
+                onClick={() => setShowWhyTooltip(false)}
+                className="mt-2 text-[11px] text-blue-600 hover:underline"
+              >
+                Close
+              </button>
+            </div>
+          )}
+        </div>
 
         {/* Feedback buttons */}
         <div className="flex gap-2 mt-3 border-t pt-2">
           {feedbackSent ? (
             <span className="text-xs text-green-600">
-              ✓ {feedbackSent === "LIKE" ? "Liked" : feedbackSent === "SAVE" ? "Saved" : "Hidden"}
+              {feedbackSubmitting ? "Saving..." : "✓ "}
+              {feedbackSent === "LIKE" ? "Liked" : feedbackSent === "SAVE" ? "Saved" : "Hidden"}
             </span>
           ) : (
             <>
@@ -152,6 +190,7 @@ const RecommendationCard: React.FC<RecommendationCardProps> = ({
                 variant="ghost"
                 size="sm"
                 className="text-xs h-7"
+                disabled={feedbackSubmitting}
                 onClick={() => sendFeedback("LIKE")}
               >
                 👍 Like
@@ -160,6 +199,7 @@ const RecommendationCard: React.FC<RecommendationCardProps> = ({
                 variant="ghost"
                 size="sm"
                 className="text-xs h-7"
+                disabled={feedbackSubmitting}
                 onClick={() => sendFeedback("SAVE")}
               >
                 🔖 Save
@@ -168,6 +208,7 @@ const RecommendationCard: React.FC<RecommendationCardProps> = ({
                 variant="ghost"
                 size="sm"
                 className="text-xs h-7 text-gray-400"
+                disabled={feedbackSubmitting}
                 onClick={() => sendFeedback("NOT_INTERESTED")}
               >
                 ✕ Not interested
@@ -175,6 +216,9 @@ const RecommendationCard: React.FC<RecommendationCardProps> = ({
             </>
           )}
         </div>
+        {feedbackError && (
+          <div className="mt-2 text-xs text-red-500">{feedbackError}</div>
+        )}
       </CardContent>
     </Card>
   );

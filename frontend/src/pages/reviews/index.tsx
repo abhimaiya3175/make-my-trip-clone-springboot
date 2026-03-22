@@ -25,6 +25,7 @@ const ReviewsPage = () => {
   const [entityDetails, setEntityDetails] = useState<EntityDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [reviewRefreshKey, setReviewRefreshKey] = useState(0);
 
   useEffect(() => {
     if (!hasEntityQuery) {
@@ -220,9 +221,10 @@ const ReviewsPage = () => {
                   entityType={normalizedEntityType as "FLIGHT" | "HOTEL"}
                   entityId={normalizedEntityId as string}
                   userId={currentUserId}
-                  userName={user?.name || "Anonymous"}
+                  userName={user ? `${user.firstName} ${user.lastName}`.trim() : "Anonymous"}
                   onSuccess={() => {
                     setShowForm(false);
+                    setReviewRefreshKey((prev) => prev + 1);
                   }}
                 />
               </div>
@@ -230,12 +232,12 @@ const ReviewsPage = () => {
 
             {/* Reviews List */}
             <div className="bg-white rounded-xl shadow-sm p-6">
-              <h3 className="text-lg font-bold mb-4">Customer Reviews</h3>
               <ReviewList
                 entityType={normalizedEntityType as "FLIGHT" | "HOTEL"}
                 entityId={normalizedEntityId as string}
                 currentUserId={currentUserId}
-                currentUserName={user?.name || "Anonymous"}
+                currentUserName={user ? `${user.firstName} ${user.lastName}`.trim() : "Anonymous"}
+                refreshTrigger={reviewRefreshKey}
               />
             </div>
           </div>

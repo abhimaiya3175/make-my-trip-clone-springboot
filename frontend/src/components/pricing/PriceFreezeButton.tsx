@@ -5,6 +5,7 @@ import api from "@/utils/api";
 interface PriceFreezeButtonProps {
   entityId: string;
   entityType: "FLIGHT" | "HOTEL";
+  travelDate: string;
   userId?: string;
   currentPrice: number;
 }
@@ -19,6 +20,7 @@ interface FreezeInfo {
 const PriceFreezeButton: React.FC<PriceFreezeButtonProps> = ({
   entityId,
   entityType,
+  travelDate,
   userId,
   currentPrice,
 }) => {
@@ -27,6 +29,16 @@ const PriceFreezeButton: React.FC<PriceFreezeButtonProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const daysUntilTravel = (() => {
+    const selected = new Date(`${travelDate}T00:00:00`);
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const msDiff = selected.getTime() - today.getTime();
+    return Math.floor(msDiff / 86400000);
+  })();
+
+  const isFreezeWindowOpen = daysUntilTravel >= 0 && daysUntilTravel <= 7;
 
   const checkExistingFreeze = useCallback(async () => {
     if (!userId) return;
@@ -84,6 +96,7 @@ const PriceFreezeButton: React.FC<PriceFreezeButtonProps> = ({
         userId,
         entityId,
         entityType,
+        travelDate,
       });
       setFreeze(res.data?.data || null);
     } catch {
@@ -113,11 +126,16 @@ const PriceFreezeButton: React.FC<PriceFreezeButtonProps> = ({
         </div>
       ) : (
         <>
+          {!isFreezeWindowOpen && (
+            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2 py-1 mb-2">
+              Price freeze is available only within 7 days before departure.
+            </p>
+          )}
           <Button
             variant="outline"
             size="sm"
             onClick={handleFreeze}
-            disabled={loading}
+            disabled={loading || !isFreezeWindowOpen}
             className="w-full"
           >
             {loading ? "Freezing..." : `🔒 Freeze Price at ₹${currentPrice} for 24h`}

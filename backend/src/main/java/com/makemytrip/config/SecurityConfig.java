@@ -44,7 +44,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/api/reviews/**").authenticated()
                 .requestMatchers(HttpMethod.DELETE, "/api/reviews/**").authenticated()
                 .requestMatchers(HttpMethod.POST, "/api/cancellation/cancel").authenticated()
-                .requestMatchers(HttpMethod.GET, "/api/cancellation/user/**").authenticated()
+                .requestMatchers(HttpMethod.GET, "/api/cancellation/my/cancellations").authenticated()
                 .anyRequest().permitAll()
             )
             .headers(headers -> headers

@@ -34,7 +34,24 @@ const RecommendationsSection: React.FC<RecommendationsSectionProps> = ({
     try {
       const params = itemType ? { itemType } : {};
       const res = await api.get(`/api/recommendations/user/${userId}`, { params });
-      setRecommendations(res.data?.data || []);
+      const nextRecommendations: Recommendation[] = res.data?.data || [];
+      setRecommendations(nextRecommendations);
+
+      // Feed loop: record lightweight view events for top results.
+      if (userId && userId !== "guest") {
+        const top = nextRecommendations.slice(0, 3);
+        await Promise.allSettled(
+          top.map((rec) =>
+            api.post("/api/recommendations/events", {
+              userId,
+              eventType: "VIEW",
+              entityId: rec.itemId,
+              entityType: rec.itemType,
+              metadata: "source:recommendations_feed",
+            })
+          )
+        );
+      }
     } catch {
       setError("Could not load recommendations.");
     } finally {

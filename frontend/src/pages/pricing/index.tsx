@@ -12,7 +12,8 @@ type EntityType = "FLIGHT" | "HOTEL";
 interface PriceData {
   finalPrice: number;
   basePrice: number;
-  multiplier: number;
+  totalMultiplier?: number;
+  multiplier?: number;
 }
 
 export default function PricingPage() {
@@ -22,9 +23,25 @@ export default function PricingPage() {
   const [flights, setFlights] = useState<any[]>([]);
   const [hotels, setHotels] = useState<any[]>([]);
   const [selectedEntityId, setSelectedEntityId] = useState("");
+  const [travelDate, setTravelDate] = useState(() => {
+    const date = new Date();
+    date.setDate(date.getDate() + 7);
+    return date.toISOString().split("T")[0];
+  });
   const [priceData, setPriceData] = useState<PriceData | null>(null);
   const [priceLoading, setPriceLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const freezeEligibility = useMemo(() => {
+    const selected = new Date(`${travelDate}T00:00:00`);
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const daysUntilTravel = Math.floor((selected.getTime() - today.getTime()) / 86400000);
+    return {
+      daysUntilTravel,
+      eligible: daysUntilTravel >= 0 && daysUntilTravel <= 7,
+    };
+  }, [travelDate]);
 
   useEffect(() => {
     const loadData = async () => {
@@ -72,7 +89,7 @@ export default function PricingPage() {
       setError(null);
       try {
         const res = await fetch(
-          `${API_BASE}/api/pricing/${entityType}/${selectedEntityId}${user?.id ? `?userId=${user.id}` : ""}`
+          `${API_BASE}/api/pricing/${entityType}/${selectedEntityId}?travelDate=${travelDate}${user?.id ? `&userId=${user.id}` : ""}`
         );
         const json = await res.json();
         if (!res.ok) {
@@ -80,7 +97,14 @@ export default function PricingPage() {
           setPriceData(null);
           return;
         }
-        setPriceData(json.data || null);
+        if (json?.data) {
+          setPriceData({
+            ...json.data,
+            totalMultiplier: json.data.totalMultiplier ?? json.data.multiplier,
+          });
+        } else {
+          setPriceData(null);
+        }
       } catch {
         setError("Pricing service is unreachable");
         setPriceData(null);
@@ -90,7 +114,7 @@ export default function PricingPage() {
     };
 
     fetchPrice();
-  }, [entityType, selectedEntityId, user?.id]);
+  }, [entityType, selectedEntityId, travelDate, user?.id]);
 
   if (loading) return <Loader />;
 
@@ -102,7 +126,7 @@ export default function PricingPage() {
           Dedicated page for pricing backend endpoints.
         </p>
 
-        <div className="bg-white rounded-xl border p-4 grid grid-cols-1 md:grid-cols-2 gap-3 mb-6">
+        <div className="bg-white rounded-xl border p-4 grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
           <select
             value={entityType}
             onChange={(e) => setEntityType(e.target.value as EntityType)}
@@ -123,6 +147,28 @@ export default function PricingPage() {
               </option>
             ))}
           </select>
+
+          <input
+            type="date"
+            value={travelDate}
+            min={new Date().toISOString().split("T")[0]}
+            onChange={(e) => setTravelDate(e.target.value)}
+            className="w-full border rounded-lg px-3 py-2"
+          />
+        </div>
+
+        <div className="mb-6">
+          <span
+            className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium border ${
+              freezeEligibility.eligible
+                ? "bg-green-50 text-green-700 border-green-200"
+                : "bg-amber-50 text-amber-700 border-amber-200"
+            }`}
+          >
+            {freezeEligibility.eligible
+              ? `Price Freeze Eligible (${freezeEligibility.daysUntilTravel} day${freezeEligibility.daysUntilTravel === 1 ? "" : "s"} to departure)`
+              : "Price Freeze Not Eligible (available only in last 7 days)"}
+          </span>
         </div>
 
         {priceLoading ? (
@@ -137,7 +183,7 @@ export default function PricingPage() {
             </div>
             <div className="bg-white rounded-xl border p-5">
               <p className="text-sm text-gray-500">Multiplier</p>
-              <p className="text-2xl font-bold">{priceData.multiplier}x</p>
+              <p className="text-2xl font-bold">{(priceData.totalMultiplier ?? 1).toFixed(2)}x</p>
             </div>
             <div className="bg-white rounded-xl border p-5">
               <p className="text-sm text-gray-500">Current Dynamic Price</p>
@@ -153,6 +199,7 @@ export default function PricingPage() {
               <PriceFreezeButton
                 entityId={selectedEntityId}
                 entityType={entityType}
+                travelDate={travelDate}
                 userId={user?.id}
                 currentPrice={priceData?.finalPrice || 0}
               />

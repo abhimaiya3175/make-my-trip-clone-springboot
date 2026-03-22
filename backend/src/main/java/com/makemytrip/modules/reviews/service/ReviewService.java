@@ -33,10 +33,25 @@ public class ReviewService {
     public Review createReview(String userId, String userName, CreateReviewRequest request) {
         // Validation
         validateReview(request);
-        
-        // Check if user already reviewed this entity
-        if (reviewRepository.existsByUserIdAndEntityTypeAndEntityId(userId, request.getEntityType(), request.getEntityId())) {
-            throw new IllegalArgumentException("User has already reviewed this " + request.getEntityType());
+
+        // If the user already has a review for this entity, update it instead of failing.
+        Optional<Review> existingReview = reviewRepository.findByUserIdAndEntityTypeAndEntityId(
+            userId,
+            request.getEntityType(),
+            request.getEntityId()
+        );
+
+        if (existingReview.isPresent()) {
+            Review review = existingReview.get();
+            review.setUserName(userName);
+            review.setRating(request.getRating());
+            review.setText(request.getText());
+            review.setPhotos(request.getPhotos() != null ? request.getPhotos() : List.of());
+            review.setModerationStatus(ModerationStatus.ACTIVE);
+            review.setUpdatedAt(LocalDateTime.now());
+
+            log.info("Updating existing review for {} {} by user {}", request.getEntityType(), request.getEntityId(), userId);
+            return reviewRepository.save(review);
         }
         
         Review review = new Review();

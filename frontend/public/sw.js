@@ -24,7 +24,19 @@ self.addEventListener("push", (event) => {
     },
   };
 
-  event.waitUntil(self.registration.showNotification(payload.title, notificationOptions));
+  event.waitUntil(
+    Promise.all([
+      self.registration.showNotification(payload.title, notificationOptions),
+      clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
+        clientList.forEach((client) => {
+          client.postMessage({
+            type: "FLIGHT_STATUS_PUSH",
+            payload,
+          });
+        });
+      }),
+    ])
+  );
 });
 
 self.addEventListener("notificationclick", (event) => {

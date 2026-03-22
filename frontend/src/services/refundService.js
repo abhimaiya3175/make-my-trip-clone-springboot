@@ -90,22 +90,25 @@ export const processCancellation = async (
     });
     
     const { bookingId, reason } = cancellationRequest;
-    
-    // Call new cancelBooking endpoint
-    const result = await bookingService.cancelBooking(bookingId, userId, reason);
-    
-    // Transform response to match expected format
-    const response = {
-      success: true,
-      bookingId,
-      newBookingStatus: "CANCELLED",
-      refundAmount: originalPrice,
-      refundPercentage: 100,
-      refundStatus: "INITIATED",
-      message: "Booking cancelled successfully. Refund will be processed within 5-7 business days.",
-      data: result,
-    };
-    
+
+    // Persist cancellation via cancellation module so it appears in /my/cancellations.
+    const res = await api.post(
+      `/api/cancellation/cancel`,
+      {
+        ...cancellationRequest,
+        bookingId,
+        reason,
+      },
+      {
+        params: {
+          totalQuantity,
+          originalPrice,
+          travelDateTimeString,
+        },
+      }
+    );
+
+    const response = unwrapApiResponse(res);
     console.log("[API] processCancellation response:", response);
     return response;
   } catch (error) {
@@ -135,48 +138,15 @@ export const getRefundStatus = async (bookingId) => {
 };
 
 /**
- * Get user's cancelled bookings
- * Filters bookings by status=CANCELLED
+ * Get user's cancelled bookings from secured endpoint
  */
-export const getUserCancellations = async (userId) => {
+export const getUserCancellations = async () => {
   try {
-    if (!userId) {
-      console.error("[API] getUserCancellations called with empty userId!", { userId, type: typeof userId });
-      throw new Error("userId is required");
-    }
-    
-    console.log("[API] getUserCancellations request", {
-      userId, userIdType: typeof userId,
-    });
-    
-    // Get all user bookings
-    const bookings = await bookingService.getUserBookings(userId);
-    
-    // Transform cancelled bookings to match old cancellation format
-    const cancellations = (bookings || [])
-      .filter(b => b.bookingStatus === "CANCELLED")
-      .map((booking) => ({
-        cancellationId: booking.id,
-        bookingId: booking.id,
-        userId: booking.userId,
-        bookingType: booking.entityType,
-        newBookingStatus: "CANCELLED",
-        cancelledQuantity: 1,
-        totalQuantity: 1,
-        partialCancellation: false,
-        refundPercentage: 100,
-        refundAmount: booking.price || 0,
-        originalPrice: booking.price || 0,
-        refundStatus: booking.paymentStatus === "REFUNDED" ? "COMPLETED" : "PROCESSING",
-        cancellationDate: booking.bookingDate,
-        travelDate: booking.travelDate,
-      }));
-    
-    console.log("[API] getUserCancellations SUCCESS. Response:", cancellations);
-    return cancellations;
+    const res = await api.get(`/api/cancellation/my/cancellations`);
+    return unwrapApiResponse(res);
   } catch (error) {
     console.error("[API] getUserCancellations FAILED", {
-      userId, status: error?.response?.status,
+      status: error?.response?.status,
       statusText: error?.response?.statusText, data: error?.response?.data, message: error.message,
     });
     throw error;

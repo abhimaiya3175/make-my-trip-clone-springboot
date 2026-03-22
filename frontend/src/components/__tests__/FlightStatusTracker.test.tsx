@@ -14,8 +14,10 @@ jest.mock("next/router", () => ({
 
 // Mock flightStatusService
 const mockGetFlightStatus = jest.fn();
+const mockGetAllLiveFlightStatuses = jest.fn();
 jest.mock("@/services/flightStatusService", () => ({
   getFlightStatus: (...args: any[]) => mockGetFlightStatus(...args),
+  getAllLiveFlightStatuses: (...args: any[]) => mockGetAllLiveFlightStatuses(...args),
 }));
 
 import FlightStatusTracker from "../Flights/FlightStatusTracker";
@@ -38,8 +40,11 @@ const mockStatusOnTime = {
 const mockStatusDelayed = {
   ...mockStatusOnTime,
   status: "DELAYED",
+  statusMessage: "Delayed by 45 min",
   delayMinutes: 45,
   delayReason: "Weather conditions",
+  arrivalDelayMinutes: 45,
+  estimatedArrivalUpdate: "Estimated arrival moved by 45 minutes",
   estimatedDeparture: "2026-03-06T10:45:00Z",
   estimatedArrival: "2026-03-06T12:45:00Z",
 };
@@ -58,6 +63,7 @@ describe("FlightStatusTracker", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.useFakeTimers();
+    mockGetAllLiveFlightStatuses.mockResolvedValue([]);
   });
 
   afterEach(() => {
@@ -97,10 +103,12 @@ describe("FlightStatusTracker", () => {
     await user.click(screen.getByRole("button", { name: /track/i }));
 
     await waitFor(() => {
-      expect(screen.getByText(/DELAYED/)).toBeInTheDocument();
+      expect(screen.getByText("Delayed by 45 min")).toBeInTheDocument();
     });
+    expect(screen.getByText("Delayed by 45m")).toBeInTheDocument();
     expect(screen.getByText("45 minutes")).toBeInTheDocument();
     expect(screen.getByText("Weather conditions")).toBeInTheDocument();
+    expect(screen.getByText("Estimated arrival moved by 45 minutes")).toBeInTheDocument();
   });
 
   it("renders CANCELLED status", async () => {

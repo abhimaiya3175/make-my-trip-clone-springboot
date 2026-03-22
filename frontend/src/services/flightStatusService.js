@@ -15,6 +15,11 @@ export const listFlightStatuses = async (page = 0, size = 10) => {
   return unwrapApiResponse(response.data);
 };
 
+export const getAllLiveFlightStatuses = async () => {
+  const response = await api.get(`/api/flight-status/live`);
+  return unwrapApiResponse(response.data);
+};
+
 export const getVapidPublicKey = async () => {
   const response = await api.get(`/api/flight-status/vapid-public-key`);
   const payload = unwrapApiResponse(response.data);

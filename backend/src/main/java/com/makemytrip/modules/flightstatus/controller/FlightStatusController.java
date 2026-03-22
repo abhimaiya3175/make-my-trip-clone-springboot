@@ -11,6 +11,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -47,6 +48,11 @@ public class FlightStatusController {
     ) {
         Page<FlightStatusResponse> response = service.listAll(PageRequest.of(page, size));
         return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/live")
+    public ResponseEntity<List<FlightStatusResponse>> listAllLiveStatuses() {
+        return ResponseEntity.ok(service.listAllLive());
     }
 
     @PostMapping("/subscribe")

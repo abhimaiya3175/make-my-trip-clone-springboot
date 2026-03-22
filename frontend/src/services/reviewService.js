@@ -2,6 +2,11 @@ import api, { unwrapApiResponse } from "@/utils/api";
 
 // ======== Phase 1: Enhanced Review APIs ========
 
+const normalizeEntityType = (value) => {
+  if (!value) return value;
+  return String(value).trim().toUpperCase();
+};
+
 /**
  * Create a new review
  * @param {string} userId - User ID (from auth)
@@ -11,7 +16,10 @@ import api, { unwrapApiResponse } from "@/utils/api";
  */
 export const createReview = async (userId, userName, reviewData) => {
   try {
-    const payload = { ...reviewData, userName };
+    const payload = {
+      ...reviewData,
+      entityType: normalizeEntityType(reviewData?.entityType),
+    };
     const res = await api.post(`/api/reviews`, payload);
     return unwrapApiResponse(res);
   } catch (error) {
@@ -28,7 +36,7 @@ export const createReview = async (userId, userName, reviewData) => {
 export const getReviews = async ({ entityType, entityId, sortBy = 'latest', page = 1, size = 10 }) => {
   try {
     const res = await api.get(`/api/reviews`, {
-      params: { entityType, entityId, sortBy, page, size }
+      params: { entityType: normalizeEntityType(entityType), entityId, sortBy, page, size }
     });
     return unwrapApiResponse(res);
   } catch (error) {
@@ -61,7 +69,11 @@ export const getReviewById = async (reviewId) => {
  */
 export const updateReview = async (reviewId, userId, reviewData) => {
   try {
-    const res = await api.put(`/api/reviews/${reviewId}`, reviewData);
+    const payload = {
+      ...reviewData,
+      entityType: normalizeEntityType(reviewData?.entityType),
+    };
+    const res = await api.put(`/api/reviews/${reviewId}`, payload);
     return unwrapApiResponse(res);
   } catch (error) {
     console.error('Update review error:', error);

@@ -15,7 +15,8 @@ import {
   Home,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { getHotelById, handlehotelbooking } from "@/api";
+import { getHotelById } from "@/api";
+import { createBooking, confirmPayment } from "@/services/bookingService";
 interface Hotel {
   id: string; // Unique identifier for the hotel
   hotelName: string; // Name of the hotel
@@ -23,6 +24,11 @@ interface Hotel {
   pricePerNight: number; // Price per night
   availableRooms: number; // Number of available rooms
   amenities: string; // Amenities provided (comma-separated string or change to string[])
+}
+interface SelectedRoomInfo {
+  id: string;
+  roomNumber: string;
+  roomType: "STANDARD" | "DELUXE" | "SUITE" | "PENTHOUSE";
 }
 import {
   Dialog,
@@ -46,11 +52,16 @@ import ReviewList from "@/components/reviews/ReviewList";
 
 const BookHotelPage = () => {
   const [quantity, setQuantity] = useState(1);
+  const [numberOfNights, setNumberOfNights] = useState(1);
   const [showReviewForm, setShowReviewForm] = useState(false);
+  const [reviewRefreshKey, setReviewRefreshKey] = useState(0);
   const router = useRouter();
   const { id } = router.query; // Access the hotel ID from the URL
   const [hotels, sethotels] = useState<Hotel[]>([]);
   const [loading, setLoading] = useState(true);
+  const [bookingInProgress, setBookingInProgress] = useState(false);
+  const [bookingError, setBookingError] = useState("");
+  const [selectedRoom, setSelectedRoom] = useState<SelectedRoomInfo | null>(null);
   const user = useSelector((state: any) => state.user.user);
   const currentUserId = user?.id || user?._id;
   const [open, setopem] = useState(false);
@@ -141,39 +152,75 @@ const BookHotelPage = () => {
     }
   };
 
-  const totalPrice = (hotel?.pricePerNight || 0) * quantity;
-  const totalTaxes = (hotelData?.room.taxes || 0) * quantity;
-  const totalDiscounts = (hotelData?.room.discountedPrice || 0) * quantity;
+  const totalPrice = (hotel?.pricePerNight || 0) * quantity * numberOfNights;
+  const totalTaxes = (hotelData?.room.taxes || 0) * quantity * numberOfNights;
+  const totalDiscounts = (hotelData?.room.discountedPrice || 0) * quantity * numberOfNights;
   const grandTotal = totalPrice + totalTaxes - totalDiscounts;
-  const handlebooking = async (e: React.FormEvent) => {
-    e.preventDefault();
+  
+  const handlebooking = async () => {
+    if (bookingInProgress) {
+      return;
+    }
+
+    if (!currentUserId) {
+      setBookingError("Please log in again to continue.");
+      return;
+    }
+
+    if (numberOfNights < 1) {
+      setBookingError("Number of nights must be at least 1");
+      return;
+    }
+
+    setBookingError("");
+    setBookingInProgress(true);
     try {
-      // Pass a date 7 days in the future to allow cancellation testing
+      // Calculate check-in and check-out dates
       const futureDate = new Date();
       futureDate.setDate(futureDate.getDate() + 7);
       const checkInDate = futureDate.toISOString().substring(0, 10);
-      const data = await handlehotelbooking(
-        user?.id,
-        hotel?.id,
-        quantity,
-        grandTotal,
-        checkInDate
-      );
+      
+      // Use the new createBooking endpoint
+      const bookingData = {
+        entityType: "HOTEL",
+        entityId: hotel?.id,
+        quantity: quantity,
+        totalPrice: grandTotal,
+        travelDate: checkInDate,
+        numberOfNights: numberOfNights,
+        userName: user?.firstName || "Guest"
+      };
+      
+      const data = await createBooking(bookingData);
+
+      if (!data) {
+        throw new Error("Booking request failed. Please try again.");
+      }
+
+      // Confirm payment to block rooms and finalize booking
+      const bookingId = data?.id || data?._id;
+      if (bookingId) {
+        await confirmPayment(bookingId);
+      }
+
       const updateuser = {
         ...user,
-        bookings: [...user.bookings, data],
+        bookings: [...(Array.isArray(user?.bookings) ? user.bookings : []), data],
       };
       dispatch(setUser(updateuser));
       setopem(false);
       setQuantity(1);
-      const bookingId = data?.id || data?._id;
+      setNumberOfNights(1);
       if (bookingId) {
         router.push(`/booking/confirmation?bookingId=${encodeURIComponent(bookingId)}&type=hotel`);
         return;
       }
       router.push("/profile");
     } catch (error) {
-      console.log(error);
+      const message = error instanceof Error ? error.message : "Unable to process booking right now.";
+      setBookingError(message);
+    } finally {
+      setBookingInProgress(false);
     }
   };
   const HotelContent = () => (
@@ -240,9 +287,35 @@ const BookHotelPage = () => {
               onChange={handleQuantityChange}
             />
           </div>
+
+          {/* Number of Nights */}
+          <div className="space-y-2">
+            <Label htmlFor="nights" className="flex items-center">
+              <Home className="w-4 h-4 mr-2" />
+              Number of Nights
+            </Label>
+            <Input
+              id="nights"
+              type="number"
+              min="1"
+              max="365"
+              value={numberOfNights}
+              onChange={(e) => setNumberOfNights(Math.max(1, Number.parseInt(e.target.value) || 1))}
+              className="bg-white"
+            />
+          </div>
           <div className="md:col-span-2 mt-4 bg-gray-50 p-4 rounded-xl border">
             <h3 className="font-semibold text-gray-800 mb-2">Select Your Room Type</h3>
-            <RoomGrid hotelId={hotel?.id as string} userId={currentUserId as string} />
+            <RoomGrid
+              hotelId={hotel?.id as string}
+              userId={currentUserId as string}
+              onRoomConfirm={(room) => setSelectedRoom(room as SelectedRoomInfo)}
+            />
+            {selectedRoom && (
+              <p className="mt-2 text-sm text-green-700">
+                Selected Room: {selectedRoom.roomNumber} ({selectedRoom.roomType})
+              </p>
+            )}
           </div>
         </div>
         <div className="bg-gray-100 rounded-lg p-4">
@@ -280,7 +353,12 @@ const BookHotelPage = () => {
           </div>
         </div>
       </div>
-      <Button className="w-full mt-4 shrink-0" onClick={handlebooking}>Proceed to Payment</Button>
+      {bookingError && (
+        <p className="text-sm text-red-600 mt-2">{bookingError}</p>
+      )}
+      <Button className="w-full mt-4 shrink-0" onClick={handlebooking} disabled={bookingInProgress}>
+        {bookingInProgress ? "Processing..." : "Proceed to Payment"}
+      </Button>
     </DialogContent>
   );
   return (
@@ -556,8 +634,11 @@ const BookHotelPage = () => {
                     entityType="HOTEL"
                     entityId={hotel?.id as string}
                     userId={currentUserId}
-                    userName={user?.name || "Anonymous"}
-                    onSuccess={() => setShowReviewForm(false)}
+                    userName={user ? `${user.firstName} ${user.lastName}`.trim() : "Anonymous"}
+                    onSuccess={() => {
+                      setShowReviewForm(false);
+                      setReviewRefreshKey((prev) => prev + 1);
+                    }}
                   />
                 </div>
               )}
@@ -566,7 +647,8 @@ const BookHotelPage = () => {
                 entityType="HOTEL"
                 entityId={hotel?.id as string}
                 currentUserId={currentUserId}
-                currentUserName={user?.name || "Anonymous"}
+                currentUserName={user ? `${user.firstName} ${user.lastName}`.trim() : "Anonymous"}
+                refreshTrigger={reviewRefreshKey}
               />
             </div>
           </div>

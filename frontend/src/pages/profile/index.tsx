@@ -20,7 +20,7 @@ import {
 import { useDispatch, useSelector } from "react-redux";
 import { useRouter } from "next/router";
 import { clearUser, setUser } from "@/store";
-import { editprofile, getUserCancellations, getUserBookings } from "@/api";
+import { editprofile, getFlightById, getHotelById, getUserCancellations, getUserBookings } from "@/api";
 import CancellationDialog from "@/components/Cancellation/CancellationDialog";
 import RefundStatusTracker from "@/components/Cancellation/RefundStatusTracker";
 const index = () => {
@@ -37,6 +37,7 @@ const index = () => {
   const [selectedBooking, setSelectedBooking] = useState<any>(null);
   const [cancellations, setCancellations] = useState<any[]>([]);
   const [bookings, setBookings] = useState<any[]>([]);
+  const [bookingEntityNames, setBookingEntityNames] = useState<Record<string, string>>({});
 
   useEffect(() => {
     console.log("[Profile] useEffect triggered. user object:", user);
@@ -66,7 +67,7 @@ const index = () => {
     }
 
     console.log("[Profile] Fetching cancellations for userId:", userId, "type:", typeof userId);
-    getUserCancellations(userId)
+    getUserCancellations()
       .then((data) => {
         console.log("[Profile] SUCCESS: Got cancellations:", data);
         setCancellations(Array.isArray(data) ? data : []);
@@ -90,6 +91,49 @@ const index = () => {
         console.error("[Profile] ERROR fetching bookings:", error);
       });
   }, [user]);
+
+  useEffect(() => {
+    const loadBookingNames = async () => {
+      const bookingList = bookings.length > 0 ? bookings : user?.bookings || [];
+      if (!Array.isArray(bookingList) || bookingList.length === 0) {
+        setBookingEntityNames({});
+        return;
+      }
+
+      const entries = await Promise.all(
+        bookingList.map(async (booking: any) => {
+          const bookingKey = booking?.id || booking?.bookingId;
+          const entityId = booking?.entityId || booking?.bookingId;
+          const normalizedType = String(booking?.type || booking?.entityType || "").toUpperCase();
+
+          if (!bookingKey || !entityId) {
+            return [bookingKey, ""] as const;
+          }
+
+          try {
+            if (normalizedType === "FLIGHT") {
+              const flight = await getFlightById(entityId);
+              return [bookingKey, flight?.flightName || "Flight"] as const;
+            }
+            const hotel = await getHotelById(entityId);
+            return [bookingKey, hotel?.hotelName || "Hotel"] as const;
+          } catch {
+            return [bookingKey, normalizedType === "FLIGHT" ? "Flight" : "Hotel"] as const;
+          }
+        })
+      );
+
+      const nextNames: Record<string, string> = {};
+      entries.forEach(([key, value]) => {
+        if (key) {
+          nextNames[key] = value;
+        }
+      });
+      setBookingEntityNames(nextNames);
+    };
+
+    loadBookingNames();
+  }, [bookings, user?.bookings]);
 
   const handleCancelBooking = (booking: any) => {
     setSelectedBooking(booking);
@@ -343,7 +387,7 @@ const index = () => {
                           </div>
                         )}
                         <div>
-                          <h3 className="font-semibold">{displayType}</h3>
+                          <h3 className="font-semibold">{bookingEntityNames[booking?.id || booking?.bookingId] || displayType}</h3>
                           <p className="text-sm text-gray-500">
                             Booking ID: {booking?.id || booking?.bookingId}
                           </p>
@@ -351,7 +395,7 @@ const index = () => {
                       </div>
                       <div className="text-right">
                         <p className="font-semibold">
-                          ₹ {booking?.totalPrice.toLocaleString("en-IN")}
+                          ₹ {Number(booking?.totalPrice || 0).toLocaleString("en-IN")}
                         </p>
                         <p className="text-sm text-gray-500">{displayType}</p>
                       </div>
@@ -374,6 +418,11 @@ const index = () => {
                     {isFlightBooking && Array.isArray(booking?.seatNumbers) && booking.seatNumbers.length > 0 && (
                       <div className="mt-3 text-sm text-gray-700">
                         <span className="font-medium">Seat Number:</span> {booking.seatNumbers.join(", ")}
+                      </div>
+                    )}
+                    {!isFlightBooking && Array.isArray(booking?.seatNumbers) && booking.seatNumbers.length > 0 && (
+                      <div className="mt-3 text-sm text-gray-700">
+                        <span className="font-medium">Room Number:</span> {booking.seatNumbers.join(", ")}
                       </div>
                     )}
 
@@ -435,7 +484,7 @@ const index = () => {
             setSelectedBooking(null);
           }}
           booking={selectedBooking}
-          userId={user?.id || ""}
+          userId={user?.id || user?._id || ""}
           onCancellationComplete={handleCancellationComplete}
         />
       )}

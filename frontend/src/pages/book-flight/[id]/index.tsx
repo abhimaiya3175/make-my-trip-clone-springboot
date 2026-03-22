@@ -66,6 +66,9 @@ const BookFlightPage = () => {
   const [selectedSeats, setSelectedSeats] = useState<SelectedSeatInfo[]>([]);
   const [showSeatSelector, setShowSeatSelector] = useState(true);
   const [showReviewForm, setShowReviewForm] = useState(false);
+  const [reviewRefreshKey, setReviewRefreshKey] = useState(0);
+  const [bookingInProgress, setBookingInProgress] = useState(false);
+  const [bookingError, setBookingError] = useState("");
   const user = useSelector((state: any) => state.user.user);
   const currentUserId = user?.id || user?._id;
   const dispatch = useDispatch();
@@ -218,8 +221,23 @@ const BookFlightPage = () => {
   const grandTotal =
     totalPrice + totalTaxes + totalOtherServices + totalSeatCharges - totalDiscounts;
 
-  const handlebooking = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handlebooking = async () => {
+    if (bookingInProgress) {
+      return;
+    }
+
+    if (!currentUserId) {
+      setBookingError("Please log in again to continue.");
+      return;
+    }
+
+    if (selectedSeats.length !== quantity) {
+      setBookingError("Please select and confirm all seats before proceeding.");
+      return;
+    }
+
+    setBookingError("");
+    setBookingInProgress(true);
     try {
       // Pass a date 7 days in the future to allow cancellation testing
       const futureDate = new Date();
@@ -233,9 +251,14 @@ const BookFlightPage = () => {
         travelDate,
         selectedSeats.map((seat) => seat.seatNumber)
       );
+
+      if (!data) {
+        throw new Error("Booking request failed. Please try again.");
+      }
+
       const updateuser = {
         ...user,
-        bookings: [...user.bookings, data],
+        bookings: [...(Array.isArray(user?.bookings) ? user.bookings : []), data],
       };
       dispatch(setUser(updateuser));
       setopem(false);
@@ -249,7 +272,10 @@ const BookFlightPage = () => {
       }
       router.push("/profile");
     } catch (error) {
-      console.log(error);
+      const message = error instanceof Error ? error.message : "Unable to process booking right now.";
+      setBookingError(message);
+    } finally {
+      setBookingInProgress(false);
     }
   };
 
@@ -416,8 +442,11 @@ const BookFlightPage = () => {
           </div>
         </div>
       </div>
-      <Button className="w-full mt-4" onClick={handlebooking}>
-        Proceed to Payment
+      {bookingError && (
+        <p className="text-sm text-red-600 mt-2">{bookingError}</p>
+      )}
+      <Button className="w-full mt-4" onClick={handlebooking} disabled={bookingInProgress}>
+        {bookingInProgress ? "Processing..." : "Proceed to Payment"}
       </Button>
     </DialogContent>
   );
@@ -766,8 +795,11 @@ const BookFlightPage = () => {
                       entityType="FLIGHT"
                       entityId={flight?.id as string}
                       userId={currentUserId}
-                      userName={user?.name || "Anonymous"}
-                      onSuccess={() => setShowReviewForm(false)}
+                      userName={user ? `${user.firstName} ${user.lastName}`.trim() : "Anonymous"}
+                      onSuccess={() => {
+                        setShowReviewForm(false);
+                        setReviewRefreshKey((prev) => prev + 1);
+                      }}
                     />
                   </div>
                 )}
@@ -776,7 +808,8 @@ const BookFlightPage = () => {
                   entityType="FLIGHT"
                   entityId={flight?.id as string}
                   currentUserId={currentUserId}
-                  currentUserName={user?.name || "Anonymous"}
+                  currentUserName={user ? `${user.firstName} ${user.lastName}`.trim() : "Anonymous"}
+                  refreshTrigger={reviewRefreshKey}
                 />
               </div>
             </div>

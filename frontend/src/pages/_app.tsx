@@ -5,6 +5,7 @@ import store, { clearUser, setUser } from "@/store";
 import { Provider } from "react-redux";
 import Navbar from "@/components/Navbar";
 import ErrorBoundary from "@/components/ErrorBoundary";
+import { Toaster } from "@/components/ui/sonner";
 
 import { useEffect } from "react";
 import Footer from "@/components/Footer";
@@ -45,6 +46,7 @@ export default function App(props: AppProps) {
         <title>MakeMyTour</title>
       </Head>
       <Myapp {...props} />
+      <Toaster />
     </Provider>
   );
 }

@@ -37,7 +37,7 @@ const CancellationsPage = () => {
     setLoading(true);
     setError("");
     try {
-      const data = await getUserCancellations(user.id);
+      const data = await getUserCancellations();
       setCancellations(Array.isArray(data) ? data : []);
     } catch (err) {
       setError("Failed to load cancellations. Please try again.");

@@ -14,12 +14,16 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
   Bus,
+  Building2,
   Calendar,
   Car,
+  ChevronRight,
+  ClipboardList,
   CreditCard,
   HomeIcon,
   Hotel,
   MapPin,
+  MessageSquareText,
   Plane,
   QrCode,
   Shield,
@@ -29,6 +33,8 @@ import {
   LogOut,
   User,
   FileX2,
+  Armchair,
+  BadgeIndianRupee,
 } from "lucide-react";
 import { useRouter } from "next/router";
 import { useEffect, useMemo, useState } from "react";
@@ -82,6 +88,20 @@ export default function Home() {
   const logout = () => {
     dispatch(clearUser());
   };
+
+  const quickLinks = [
+    { href: "/", label: "Home", icon: <HomeIcon className="w-4 h-4" /> },
+    { href: "/flights", label: "Flights", icon: <Plane className="w-4 h-4" /> },
+    { href: "/hotels", label: "Hotels", icon: <Building2 className="w-4 h-4" /> },
+    { href: "/bookings", label: "Bookings", icon: <ClipboardList className="w-4 h-4" /> },
+    { href: "/seat-room", label: "Seat & Room", icon: <Armchair className="w-4 h-4" /> },
+    { href: "/pricing", label: "Pricing", icon: <BadgeIndianRupee className="w-4 h-4" /> },
+    { href: "/flight-status", label: "Flight Status", icon: <Plane className="w-4 h-4" /> },
+    { href: "/recommendations", label: "Recommendations", icon: <Building2 className="w-4 h-4" /> },
+    { href: "/reviews", label: "Reviews", icon: <MessageSquareText className="w-4 h-4" /> },
+    { href: "/cancellations", label: "Cancellations", icon: <FileX2 className="w-4 h-4" /> },
+  ];
+
   const flightD = [
     { id: 1, from: "Delhi", to: "Mumbai", date: "2025-01-15", price: 5000 },
     { id: 2, from: "Mumbai", to: "Bengaluru", date: "2025-01-16", price: 4500 },
@@ -283,6 +303,17 @@ export default function Home() {
                         <p className="text-xs leading-none text-muted-foreground">{user?.email}</p>
                       </div>
                     </DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuLabel className="text-[11px] uppercase tracking-wide text-gray-400">
+                      Quick Links
+                    </DropdownMenuLabel>
+                    {quickLinks.map((link) => (
+                      <DropdownMenuItem key={link.href + link.label} onClick={() => router.push(link.href)}>
+                        {link.icon}
+                        <span>{link.label}</span>
+                        <ChevronRight className="ml-auto h-3.5 w-3.5 text-gray-400" />
+                      </DropdownMenuItem>
+                    ))}
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={() => router.push("/profile")}>
                       <User className="mr-2 h-4 w-4" />

@@ -27,7 +27,9 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
@@ -42,7 +44,7 @@ public class FlightStatusService {
     private final FlightPushSubscriptionRepository pushSubscriptionRepository;
     private final Random random = new Random();
     private static final int DEFAULT_DURATION_MINUTES = 120;
-    private final Map<String, FlightStatusEnum> lastKnownStatusSnapshot = new ConcurrentHashMap<>();
+    private final Map<String, String> lastKnownStatusSnapshot = new ConcurrentHashMap<>();
 
     @Value("${vapid.public.key}")
     private String vapidPublicKey;
@@ -169,6 +171,13 @@ public class FlightStatusService {
         return repository.findAll(pageable).map(this::mapToResponse);
     }
 
+    public List<FlightStatusResponse> listAllLive() {
+        return repository.findAll().stream()
+                .map(this::mapToResponse)
+                .sorted(Comparator.comparing(FlightStatusResponse::getFlightId))
+                .toList();
+    }
+
     public void savePushSubscription(PushSubscriptionRequest request) {
         FlightPushSubscription subscription = pushSubscriptionRepository
                 .findByEndpointAndFlightId(request.getEndpoint(), request.getFlightId())
@@ -198,17 +207,17 @@ public class FlightStatusService {
         }
 
         for (FlightStatus flight : flights) {
-            FlightStatusEnum currentStatus = flight.getStatus();
-            FlightStatusEnum previousStatus = lastKnownStatusSnapshot.get(flight.getFlightId());
+            String currentSnapshot = buildNotificationSnapshot(flight);
+            String previousSnapshot = lastKnownStatusSnapshot.get(flight.getFlightId());
 
-            if (previousStatus == null) {
-                lastKnownStatusSnapshot.put(flight.getFlightId(), currentStatus);
+            if (previousSnapshot == null) {
+                lastKnownStatusSnapshot.put(flight.getFlightId(), currentSnapshot);
                 continue;
             }
 
-            if (currentStatus != previousStatus) {
-                notifySubscribers(flight, previousStatus);
-                lastKnownStatusSnapshot.put(flight.getFlightId(), currentStatus);
+            if (!currentSnapshot.equals(previousSnapshot)) {
+                notifySubscribers(flight, previousSnapshot);
+                lastKnownStatusSnapshot.put(flight.getFlightId(), currentSnapshot);
             }
         }
     }
@@ -226,19 +235,22 @@ public class FlightStatusService {
                 .scheduledArrival(flight.getScheduledArrival())
                 .estimatedArrival(flight.getEstimatedArrival())
                 .status(flight.getStatus())
+                .statusMessage(buildStatusMessage(flight))
                 .delayMinutes(flight.getDelayMinutes())
                 .delayReason(flight.getDelayReason())
+                .arrivalDelayMinutes(calculateArrivalDelayMinutes(flight))
+                .estimatedArrivalUpdate(buildEstimatedArrivalUpdate(flight))
                 .lastUpdated(flight.getLastUpdated())
                 .build();
     }
 
-    private void notifySubscribers(FlightStatus flight, FlightStatusEnum previousStatus) {
+    private void notifySubscribers(FlightStatus flight, String previousSnapshot) {
         List<FlightPushSubscription> subscriptions = pushSubscriptionRepository.findByFlightId(flight.getFlightId());
         if (subscriptions.isEmpty()) {
             return;
         }
 
-        String payload = buildPushPayload(flight, previousStatus);
+        String payload = buildPushPayload(flight, previousSnapshot);
         PushService pushService;
         try {
             pushService = new PushService()
@@ -265,9 +277,15 @@ public class FlightStatusService {
         }
     }
 
-    private String buildPushPayload(FlightStatus flight, FlightStatusEnum previousStatus) {
+    private String buildPushPayload(FlightStatus flight, String previousSnapshot) {
+        String previousStatus = previousSnapshot == null
+                ? "UNKNOWN"
+                : previousSnapshot.split("\\|", 2)[0];
         String title = String.format("%s %s status update", flight.getAirline(), flight.getFlightId());
-        String body = String.format("Status changed from %s to %s", previousStatus, flight.getStatus());
+        String body = String.format("Status changed from %s to %s. %s",
+                previousStatus,
+                flight.getStatus(),
+                buildEstimatedArrivalUpdate(flight));
 
         try {
             ObjectMapper mapper = new ObjectMapper();
@@ -275,7 +293,11 @@ public class FlightStatusService {
                     "title", title,
                     "body", body,
                     "flightId", flight.getFlightId(),
-                    "status", flight.getStatus().name()
+                    "status", flight.getStatus().name(),
+                    "statusMessage", buildStatusMessage(flight),
+                    "delayReason", flight.getDelayReason() == null ? "" : flight.getDelayReason(),
+                    "estimatedArrivalUpdate", buildEstimatedArrivalUpdate(flight),
+                    "lastUpdated", flight.getLastUpdated() == null ? "" : flight.getLastUpdated().toString()
             ));
         } catch (Exception ex) {
             log.warn("Failed to serialize push payload for flight {}", flight.getFlightId(), ex);
@@ -285,7 +307,7 @@ public class FlightStatusService {
 
     private void refreshStatusSnapshot() {
         lastKnownStatusSnapshot.clear();
-        repository.findAll().forEach(flight -> lastKnownStatusSnapshot.put(flight.getFlightId(), flight.getStatus()));
+        repository.findAll().forEach(flight -> lastKnownStatusSnapshot.put(flight.getFlightId(), buildNotificationSnapshot(flight)));
     }
 
     private void ensureArrivalTimes(FlightStatus flight) {
@@ -306,5 +328,41 @@ public class FlightStatusService {
             int delay = flight.getDelayMinutes() == null ? 0 : flight.getDelayMinutes();
             flight.setEstimatedArrival(flight.getScheduledArrival().plusMinutes(delay));
         }
+    }
+
+    private String buildNotificationSnapshot(FlightStatus flight) {
+        Integer delay = flight.getDelayMinutes() == null ? 0 : flight.getDelayMinutes();
+        String reason = flight.getDelayReason() == null ? "" : flight.getDelayReason();
+        String eta = flight.getEstimatedArrival() == null ? "" : flight.getEstimatedArrival().toString();
+        return String.format("%s|%d|%s|%s", flight.getStatus(), delay, reason, eta);
+    }
+
+    private String buildStatusMessage(FlightStatus flight) {
+        if (flight.getStatus() == FlightStatusEnum.DELAYED) {
+            int delayMinutes = flight.getDelayMinutes() == null ? 0 : flight.getDelayMinutes();
+            if (delayMinutes >= 60 && delayMinutes % 60 == 0) {
+                return String.format("Delayed by %dh", delayMinutes / 60);
+            }
+            return String.format("Delayed by %d min", delayMinutes);
+        }
+        return flight.getStatus().name().replace("_", " ").toLowerCase(Locale.ENGLISH);
+    }
+
+    private Integer calculateArrivalDelayMinutes(FlightStatus flight) {
+        if (flight.getEstimatedArrival() == null || flight.getScheduledArrival() == null) {
+            return 0;
+        }
+        return (int) java.time.Duration.between(flight.getScheduledArrival(), flight.getEstimatedArrival()).toMinutes();
+    }
+
+    private String buildEstimatedArrivalUpdate(FlightStatus flight) {
+        Integer arrivalDelayMinutes = calculateArrivalDelayMinutes(flight);
+        if (arrivalDelayMinutes == null || arrivalDelayMinutes <= 0) {
+            return "Estimated arrival remains on schedule";
+        }
+        if (arrivalDelayMinutes >= 60 && arrivalDelayMinutes % 60 == 0) {
+            return String.format("Estimated arrival moved by %dh", arrivalDelayMinutes / 60);
+        }
+        return String.format("Estimated arrival moved by %d minutes", arrivalDelayMinutes);
     }
 }

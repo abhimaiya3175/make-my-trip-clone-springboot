@@ -441,8 +441,8 @@ spring.data.mongodb.database=makemytrip
 # CORS Configuration
 spring.web.cors.allowed-origins=http://localhost:3000
 
-# JWT Configuration (recommended: set via env var)
-app.jwt.secret=${JWT_SECRET:change-this-to-a-long-random-secret}
+# JWT Configuration (required: set via env var)
+app.jwt.secret=${JWT_SECRET}
 app.jwt.expiration-ms=86400000
 
 # Web Push (VAPID)
@@ -466,6 +466,22 @@ $env:JWT_SECRET="replace-with-a-strong-secret-at-least-32-characters"
 
 ```bash
 export JWT_SECRET="replace-with-a-strong-secret-at-least-32-characters"
+```
+
+### Test Configuration
+
+Do not commit real test secrets. Create your own local test env file from `.env.test.example` and set values before running tests.
+
+```powershell
+Copy-Item .env.test.example .env.test
+# Then set your own local value
+$env:JWT_SECRET="your-test-only-jwt-secret-value"
+```
+
+```bash
+cp .env.test.example .env.test
+# Then set your own local value
+export JWT_SECRET="your-test-only-jwt-secret-value"
 ```
 
 Generate VAPID keys (choose one):
@@ -540,7 +556,7 @@ export default api;
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | POST | `/api/cancellation/request` | Request booking cancellation |
-| GET | `/api/cancellation/user/:userId` | Get user cancellations |
+| GET | `/api/cancellation/my/cancellations` | Get user cancellations (auth user) |
 | GET | `/api/cancellation/refund/:bookingId` | Get refund tracker |
 
 ### Review & Rating Endpoints

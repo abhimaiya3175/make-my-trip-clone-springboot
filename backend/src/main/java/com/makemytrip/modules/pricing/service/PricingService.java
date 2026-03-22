@@ -20,8 +20,11 @@ import jakarta.annotation.PostConstruct;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 @Slf4j
 @Service
@@ -36,6 +39,16 @@ public class PricingService {
     private final HotelRepository hotelRepository;
 
     private static final int FREEZE_HOURS = 24;
+    private static final int MAX_FREEZE_WINDOW_DAYS = 7;
+    private static final DateTimeFormatter HOLIDAY_MM_DD = DateTimeFormatter.ofPattern("MM-dd");
+    private static final Set<String> FIXED_HOLIDAYS_MM_DD = Set.of("12-25", "01-01", "01-26", "08-15", "10-02");
+    private static final double OCCUPANCY_PRICE_SENSITIVITY = 0.006;
+    private static final double MIN_OCCUPANCY_MULTIPLIER = 0.75;
+    private static final double MAX_OCCUPANCY_MULTIPLIER = 1.30;
+
+    // Approximate capacities used to derive occupancy from available inventory.
+    private static final int ASSUMED_FLIGHT_CAPACITY = 100;
+    private static final int ASSUMED_HOTEL_CAPACITY = 40;
 
     // ── Bootstrap default rules ──────────────────────────────────────
 
@@ -59,7 +72,8 @@ public class PricingService {
                         .name("Holiday Premium")
                         .ruleType(PricingRule.RuleType.HOLIDAY)
                         .multiplier(1.30)
-                        .holidays(List.of("2025-12-25", "2025-01-01", "2025-01-26", "2025-08-15", "2025-10-02"))
+                    // Store holidays as MM-DD so they recur every year.
+                    .holidays(List.of("12-25", "01-01", "01-26", "08-15", "10-02"))
                         .entityType(null)
                         .active(true)
                         .build(),
@@ -94,63 +108,49 @@ public class PricingService {
 
     // ── Core pricing calculation ─────────────────────────────────────
 
-    public PriceResponse calculatePrice(String entityId, String entityType, String userId) {
+    public PriceResponse calculatePrice(String entityId, String entityType, String userId, LocalDate travelDate) {
         double basePrice = getBasePrice(entityId, entityType);
-        List<PricingRule> activeRules = ruleRepository.findByActiveTrue();
-
         double totalMultiplier = 1.0;
         List<String> appliedRuleNames = new ArrayList<>();
         LocalDate today = LocalDate.now();
-        String dayOfWeek = today.getDayOfWeek().name();
+        LocalDate effectiveTravelDate = travelDate != null ? travelDate : today.plusDays(7);
+        long daysUntilTravel = ChronoUnit.DAYS.between(today, effectiveTravelDate);
+        double occupancy = calculateOccupancy(entityId, entityType);
 
-        for (PricingRule rule : activeRules) {
-            // Filter by entity type
-            if (rule.getEntityType() != null && !rule.getEntityType().equals(entityType))
-                continue;
-            // Filter by specific entity IDs
-            if (rule.getEntityIds() != null && !rule.getEntityIds().contains(entityId))
-                continue;
+        double occupancyMultiplier = calculateOccupancyMultiplier(occupancy);
+        totalMultiplier *= occupancyMultiplier;
+        if (occupancyMultiplier > 1.02) {
+            appliedRuleNames.add(String.format("Occupancy Surge (%.0f%% full)", occupancy));
+        } else if (occupancyMultiplier < 0.98) {
+            appliedRuleNames.add(String.format("Low Occupancy Discount (%.0f%% full)", occupancy));
+        }
 
-            boolean applies = false;
+        double departureMultiplier = calculateDepartureMultiplier(daysUntilTravel, occupancy);
+        totalMultiplier *= departureMultiplier;
+        if (departureMultiplier > 1.0) {
+            appliedRuleNames.add("Near-Departure Demand Surge");
+        } else if (departureMultiplier < 1.0) {
+            appliedRuleNames.add("Near-Departure Empty Seat Discount");
+        }
 
-            switch (rule.getRuleType()) {
-                case WEEKEND:
-                    if (rule.getDaysOfWeek() != null && rule.getDaysOfWeek().contains(dayOfWeek)) {
-                        applies = true;
-                    }
-                    break;
-                case HOLIDAY:
-                    if (rule.getHolidays() != null && rule.getHolidays().contains(today.toString())) {
-                        applies = true;
-                    }
-                    break;
-                case LAST_MINUTE:
-                    // Always applies if booking window is short — we treat "today" as booking date
-                    if (rule.getBookingWindowDaysMax() != null && rule.getBookingWindowDaysMax() >= 1) {
-                        applies = true; // simplified: assume travel is soon
-                    }
-                    break;
-                case HIGH_DEMAND:
-                    double occupancy = calculateOccupancy(entityId, entityType);
-                    if (rule.getDemandThreshold() != null && occupancy >= rule.getDemandThreshold()) {
-                        applies = true;
-                    }
-                    break;
-                case EARLY_BIRD:
-                    // Applies if booking is > 30 days in advance (simplified: weekdays that aren't
-                    // last-minute)
-                    DayOfWeek dow = today.getDayOfWeek();
-                    boolean isWeekday = dow != DayOfWeek.SATURDAY && dow != DayOfWeek.SUNDAY;
-                    if (isWeekday && (rule.getBookingWindowDaysMax() == null)) {
-                        applies = true;
-                    }
-                    break;
-            }
+        String holidayMonthDay = effectiveTravelDate.format(HOLIDAY_MM_DD);
+        if (FIXED_HOLIDAYS_MM_DD.contains(holidayMonthDay)) {
+            totalMultiplier *= 1.15;
+            appliedRuleNames.add("Holiday Premium");
+        }
 
-            if (applies) {
-                totalMultiplier *= rule.getMultiplier();
-                appliedRuleNames.add(rule.getName());
-            }
+        DayOfWeek travelDay = effectiveTravelDate.getDayOfWeek();
+        if (travelDay == DayOfWeek.SATURDAY || travelDay == DayOfWeek.SUNDAY) {
+            totalMultiplier *= 1.07;
+            appliedRuleNames.add("Weekend Demand");
+        }
+
+        // Early-bird discount on weekdays for low-demand inventory far in advance.
+        if (daysUntilTravel >= 30 && occupancy <= 50.0
+                && travelDay != DayOfWeek.SATURDAY
+                && travelDay != DayOfWeek.SUNDAY) {
+            totalMultiplier *= 0.95;
+            appliedRuleNames.add("Early Bird Discount");
         }
 
         double finalPrice = Math.round(basePrice * totalMultiplier * 100.0) / 100.0;
@@ -191,15 +191,62 @@ public class PricingService {
     }
 
     private double calculateOccupancy(String entityId, String entityType) {
-        // Simplified: return a mock occupancy based on entity
         if ("FLIGHT".equals(entityType)) {
             return flightRepository.findById(entityId)
-                    .map(f -> f.getAvailableSeats() < 30 ? 85.0 : 50.0)
+                    .map(f -> occupancyFromAvailable(f.getAvailableSeats(), ASSUMED_FLIGHT_CAPACITY))
                     .orElse(50.0);
         }
         return hotelRepository.findById(entityId)
-                .map(h -> h.getAvailableRooms() < 5 ? 90.0 : 40.0)
+                .map(h -> occupancyFromAvailable(h.getAvailableRooms(), ASSUMED_HOTEL_CAPACITY))
                 .orElse(40.0);
+    }
+
+    private double calculateOccupancyMultiplier(double occupancyPercent) {
+        // Baseline at 50% occupancy, then scale smoothly with demand pressure.
+        double centered = occupancyPercent - 50.0;
+        return clamp(1.0 + centered * OCCUPANCY_PRICE_SENSITIVITY,
+                MIN_OCCUPANCY_MULTIPLIER,
+                MAX_OCCUPANCY_MULTIPLIER);
+    }
+
+    private double calculateDepartureMultiplier(long daysUntilTravel, double occupancyPercent) {
+        // Prices react more strongly in the final days before departure/check-in.
+        if (daysUntilTravel <= 2) {
+            if (occupancyPercent <= 35.0) {
+                return 0.85;
+            }
+            if (occupancyPercent >= 85.0) {
+                return 1.20;
+            }
+            if (occupancyPercent >= 70.0) {
+                return 1.10;
+            }
+            return 0.95;
+        }
+
+        if (daysUntilTravel <= 7) {
+            if (occupancyPercent <= 35.0) {
+                return 0.93;
+            }
+            if (occupancyPercent >= 90.0) {
+                return 1.08;
+            }
+        }
+
+        return 1.0;
+    }
+
+    private double occupancyFromAvailable(int availableUnits, int capacity) {
+        if (capacity <= 0) {
+            return 50.0;
+        }
+        int boundedAvailable = Math.max(0, Math.min(availableUnits, capacity));
+        double occupancyRatio = 1.0 - ((double) boundedAvailable / (double) capacity);
+        return occupancyRatio * 100.0;
+    }
+
+    private double clamp(double value, double min, double max) {
+        return Math.max(min, Math.min(max, value));
     }
 
     // ── Price history ────────────────────────────────────────────────
@@ -234,7 +281,7 @@ public class PricingService {
 
         List<Flight> flights = flightRepository.findAll();
         for (Flight flight : flights) {
-            PriceResponse price = calculatePrice(flight.getId(), "FLIGHT", null);
+            PriceResponse price = calculatePrice(flight.getId(), "FLIGHT", null, LocalDate.now().plusDays(7));
             PriceSnapshot snapshot = PriceSnapshot.builder()
                     .entityId(flight.getId())
                     .entityType("FLIGHT")
@@ -249,7 +296,7 @@ public class PricingService {
 
         List<Hotel> hotels = hotelRepository.findAll();
         for (Hotel hotel : hotels) {
-            PriceResponse price = calculatePrice(hotel.getId(), "HOTEL", null);
+            PriceResponse price = calculatePrice(hotel.getId(), "HOTEL", null, LocalDate.now().plusDays(7));
             PriceSnapshot snapshot = PriceSnapshot.builder()
                     .entityId(hotel.getId())
                     .entityType("HOTEL")
@@ -275,7 +322,23 @@ public class PricingService {
                     throw new IllegalStateException("You already have an active price freeze for this item");
                 });
 
-        PriceResponse currentPrice = calculatePrice(request.getEntityId(), request.getEntityType(), null);
+        LocalDate travelDate = request.getTravelDate();
+        LocalDate today = LocalDate.now();
+        long daysUntilTravel = ChronoUnit.DAYS.between(today, travelDate);
+
+        if (daysUntilTravel < 0) {
+            throw new IllegalStateException("Cannot freeze a price for a past departure date");
+        }
+
+        if (daysUntilTravel > MAX_FREEZE_WINDOW_DAYS) {
+            throw new IllegalStateException("Price freeze is available only within 7 days before departure");
+        }
+
+        PriceResponse currentPrice = calculatePrice(
+            request.getEntityId(),
+            request.getEntityType(),
+            null,
+            travelDate);
         LocalDateTime now = LocalDateTime.now();
 
         PriceFreeze freeze = PriceFreeze.builder()

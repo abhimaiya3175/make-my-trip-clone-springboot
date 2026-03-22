@@ -174,25 +174,18 @@ public class CancellationController {
      * @param userId User ID (from authentication)
      * @return List of cancellations with refund details
      */
-    @GetMapping("/user/{userId}/cancellations")
-    public ResponseEntity<?> getUserCancellations(
-            @PathVariable String userId,
-            Authentication authentication) {
+    @GetMapping("/my/cancellations")
+    public ResponseEntity<?> getUserCancellations(Authentication authentication) {
         try {
-            String currentUserId = AuthContext.userId(authentication);
-            boolean admin = AuthContext.hasRole(authentication, "ADMIN");
-            if (currentUserId == null || (!admin && !currentUserId.equals(userId))) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(errorResponse("Access denied"));
+            String userId = AuthContext.userId(authentication);
+            if (userId == null || userId.isBlank()) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(errorResponse("Authentication is required"));
             }
 
             log.info("[GET_USER_CANCELLATIONS] START userId={}, type={}, isEmpty={}", 
                 userId, userId == null ? "null" : userId.getClass().getSimpleName(), 
                 userId == null ? "N/A" : userId.isEmpty());
-            
-            if (userId == null || userId.isEmpty()) {
-                log.error("[GET_USER_CANCELLATIONS] ERROR: userId is null or empty!");
-                return ResponseEntity.badRequest().body(errorResponse("User ID is required"));
-            }
             
             List<CancellationResponseDTO> cancellations = 
                 cancellationService.getUserCancellationsWithRefundStatus(userId);

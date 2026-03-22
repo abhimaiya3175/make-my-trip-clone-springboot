@@ -106,8 +106,11 @@ class FlightStatusServiceTest {
         FlightStatusResponse result = service.getStatus("6E-2024");
 
         assertThat(result.getStatus()).isEqualTo(FlightStatusEnum.DELAYED);
+        assertThat(result.getStatusMessage()).isEqualTo("Delayed by 45 min");
         assertThat(result.getDelayMinutes()).isEqualTo(45);
         assertThat(result.getDelayReason()).isEqualTo("Weather conditions");
+        assertThat(result.getArrivalDelayMinutes()).isEqualTo(45);
+        assertThat(result.getEstimatedArrivalUpdate()).isEqualTo("Estimated arrival moved by 45 minutes");
         assertThat(result.getEstimatedArrival())
             .isEqualTo(result.getScheduledArrival().plusMinutes(result.getDelayMinutes()));
     }

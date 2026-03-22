@@ -15,6 +15,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.UUID;
@@ -22,6 +24,8 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/bookings")
 public class BookingController {
+    private static final Logger log = LoggerFactory.getLogger(BookingController.class);
+
     @Autowired
     private BookingService bookingService;
 
@@ -75,21 +79,27 @@ public class BookingController {
                 .body(ApiResponse.fail(new ApiError("UNAUTHORIZED", "Authentication is required", null), reqId));
         }
 
-        java.util.Optional<Booking> bookingOpt = bookingService.getBookingById(bookingId);
-        if (bookingOpt.isEmpty()) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(ApiResponse.fail(new ApiError("NOT_FOUND", "Booking not found", null), reqId));
-        }
+        try {
+            java.util.Optional<Booking> bookingOpt = bookingService.getBookingById(bookingId);
+            if (bookingOpt.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(ApiResponse.fail(new ApiError("NOT_FOUND", "Booking not found", null), reqId));
+            }
 
-        Booking booking = bookingOpt.get();
-        boolean owner = userId.equals(booking.getUserId());
-        boolean admin = AuthContext.hasRole(authentication, "ADMIN");
-        if (!owner && !admin) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                .body(ApiResponse.fail(new ApiError("FORBIDDEN", "Access denied", null), reqId));
-        }
+            Booking booking = bookingOpt.get();
+            boolean owner = userId.equals(booking.getUserId());
+            boolean admin = AuthContext.hasRole(authentication, "ADMIN");
+            if (!owner && !admin) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(ApiResponse.fail(new ApiError("FORBIDDEN", "Access denied", null), reqId));
+            }
 
-        return ResponseEntity.ok(ApiResponse.ok(booking, reqId));
+            return ResponseEntity.ok(ApiResponse.ok(booking, reqId));
+        } catch (Exception e) {
+            log.error("Failed to fetch booking {} for user {}", bookingId, userId, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(ApiResponse.fail(new ApiError("INTERNAL_SERVER_ERROR", "Failed to fetch booking", null), reqId));
+        }
     }
 
     /**
@@ -108,9 +118,15 @@ public class BookingController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                 .body(ApiResponse.fail(new ApiError("UNAUTHORIZED", "Authentication is required", null), reqId));
         }
-        
-        List<Booking> bookings = bookingService.getUserBookings(userId);
-        return ResponseEntity.ok(ApiResponse.ok(bookings, reqId));
+
+        try {
+            List<Booking> bookings = bookingService.getUserBookings(userId);
+            return ResponseEntity.ok(ApiResponse.ok(bookings, reqId));
+        } catch (Exception e) {
+            log.error("Failed to fetch bookings for user {}", userId, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(ApiResponse.fail(new ApiError("INTERNAL_SERVER_ERROR", "Failed to fetch bookings", null), reqId));
+        }
     }
 
     /**
@@ -260,7 +276,8 @@ public class BookingController {
             @RequestParam String hotelId, 
             @RequestParam int rooms, 
             @RequestParam double price, 
-            @RequestParam(required = false) String date) {
-        return bookingService.bookhotel(userId, hotelId, rooms, price, date);
+            @RequestParam(required = false) String date,
+            @RequestParam(required = false) String roomNumbers) {
+        return bookingService.bookhotel(userId, hotelId, rooms, price, date, roomNumbers);
     }
 }

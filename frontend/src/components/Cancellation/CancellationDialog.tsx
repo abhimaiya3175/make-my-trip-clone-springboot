@@ -53,6 +53,12 @@ const CancellationDialog: React.FC<CancellationDialogProps> = ({
     OTHER: "Other",
   };
 
+  const bookingTypeNormalized = String(booking?.entityType || booking?.type || "").toUpperCase() === "HOTEL"
+    ? "HOTEL"
+    : "FLIGHT";
+
+  const bookingId = booking?.id || booking?.bookingId;
+
   useEffect(() => {
     if (open) {
       console.log("[CancellationDialog] Opened with:", { userId, booking });
@@ -75,9 +81,10 @@ const CancellationDialog: React.FC<CancellationDialogProps> = ({
   }, [open, booking, userId]);
 
   const getTravelDateTime = () => {
-    console.log("[CancellationDialog] getTravelDateTime - booking.date:", booking?.date);
+    const travelDateSource = booking?.travelDate || booking?.date;
+    console.log("[CancellationDialog] getTravelDateTime - source:", travelDateSource);
 
-    if (!booking?.date) {
+    if (!travelDateSource) {
       // No date available - default to 48 hours from now
       const future = new Date(Date.now() + 48 * 60 * 60 * 1000);
       const result = formatLocalDateTime(future);
@@ -86,7 +93,7 @@ const CancellationDialog: React.FC<CancellationDialogProps> = ({
     }
 
     // Parse YYYY-MM-DD as local date to avoid timezone shift
-    const parts = booking.date.split("-");
+    const parts = String(travelDateSource).split("-");
     if (parts.length === 3) {
       const year = parseInt(parts[0]);
       const month = parseInt(parts[1]) - 1;
@@ -102,7 +109,7 @@ const CancellationDialog: React.FC<CancellationDialogProps> = ({
     }
 
     // Fallback for non-standard date strings
-    const d = new Date(booking.date + "T23:59:00");
+    const d = new Date(`${travelDateSource}T23:59:00`);
     if (!isNaN(d.getTime())) {
       const result = formatLocalDateTime(d);
       console.log("[CancellationDialog] Fallback datetime format worked:", result);
@@ -134,18 +141,18 @@ const CancellationDialog: React.FC<CancellationDialogProps> = ({
     try {
       const travelDate = getTravelDateTime();
       console.log("[CancellationDialog] Fetching preview:", {
-        bookingId: booking.id || booking.bookingId,
-        bookingType: booking.type?.toUpperCase() === "HOTEL" ? "HOTEL" : "FLIGHT",
+        bookingId,
+        bookingType: bookingTypeNormalized,
         quantityToCancel,
         totalQuantity: booking.quantity,
         totalPrice: booking.totalPrice,
         travelDateTime: travelDate,
-        rawBookingDate: booking.date,
+        rawBookingDate: travelDate,
       });
 
       const data = await getCancellationPreview(
-        booking.id || booking.bookingId,
-        booking.type?.toUpperCase() === "HOTEL" ? "HOTEL" : "FLIGHT",
+        bookingId,
+        bookingTypeNormalized,
         quantityToCancel,
         booking.quantity,
         booking.totalPrice,
@@ -173,8 +180,8 @@ const CancellationDialog: React.FC<CancellationDialogProps> = ({
     try {
       const travelDate = getTravelDateTime();
       const cancellationRequest = {
-        bookingId: booking.id || booking.bookingId,
-        bookingType: booking.type?.toUpperCase() === "HOTEL" ? "HOTEL" : "FLIGHT",
+        bookingId,
+        bookingType: bookingTypeNormalized,
         reason: selectedReason,
         quantityToCancel,
         additionalNotes,
@@ -197,6 +204,12 @@ const CancellationDialog: React.FC<CancellationDialogProps> = ({
       );
 
       console.log("[CancellationDialog] Cancellation response:", data);
+
+      if (!data || typeof data !== "object") {
+        setError("Invalid cancellation response. Please try again.");
+        setLoading(false);
+        return;
+      }
 
       if (data.success) {
         setResult(data);

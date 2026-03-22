@@ -10,7 +10,9 @@ import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.util.List;
+import java.util.HashMap;
 
 @Data
 @Builder
@@ -36,6 +38,10 @@ public class Room {
     private String lockedByUserId;
     private LocalDateTime lockedUntil;
 
+    // Booking blocking fields (for night-based blocking)
+    private List<LocalDate> blockedDates;        // Dates when room is blocked
+    private HashMap<String, String> dateBookingMap; // Map of date -> bookingId for reference
+    
     @Version
     private Long version;
 

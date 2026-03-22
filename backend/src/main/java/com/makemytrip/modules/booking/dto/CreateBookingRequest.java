@@ -29,6 +29,9 @@ public class CreateBookingRequest {
     @Future(message = "Travel date must be in the future")
     private LocalDate travelDate;
 
+    @Min(value = 0, message = "Number of nights must be at least 0")
+    private int numberOfNights; // For hotel bookings
+
     // Getters and Setters
     public EntityType getEntityType() {
         return entityType;
@@ -84,5 +87,13 @@ public class CreateBookingRequest {
 
     public void setTravelDate(LocalDate travelDate) {
         this.travelDate = travelDate;
+    }
+
+    public int getNumberOfNights() {
+        return numberOfNights;
+    }
+
+    public void setNumberOfNights(int numberOfNights) {
+        this.numberOfNights = numberOfNights;
     }
 }

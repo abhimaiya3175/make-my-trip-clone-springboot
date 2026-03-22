@@ -4,8 +4,10 @@ import StarRating from "./StarRating";
 import { HelpfulButton } from "./HelpfulButton";
 import { FlagButton } from "./FlagButton";
 import { ReplySection } from "./ReplySection";
-import { getReviews, voteHelpful, flagReview, replyToReview } from "@/services/reviewService";
+import { getReviews, voteHelpful, flagReview, replyToReview, updateReview, deleteReview } from "@/services/reviewService";
 import { REQUEST_STATE } from "@/utils/requestState";
+import { Edit2, Trash2, X, Check } from "lucide-react";
+import EditReviewModal from "./EditReviewModal";
 
 interface Review {
   id: string;
@@ -39,6 +41,7 @@ interface ReviewListProps {
   currentUserId?: string;
   currentUserName?: string;
   isOwner?: boolean;
+  refreshTrigger?: number;
 }
 
 const SORT_OPTIONS = [
@@ -52,18 +55,40 @@ const ReviewList: React.FC<ReviewListProps> = ({
   entityId, 
   currentUserId,
   currentUserName,
-  isOwner = false
+  isOwner = false,
+  refreshTrigger = 0,
 }) => {
+  const resolvePhotoUrl = (photoUrl: string) => {
+    if (!photoUrl) return "";
+    if (/^https?:\/\//i.test(photoUrl) || /^data:/i.test(photoUrl)) {
+      return photoUrl;
+    }
+
+    const normalizedPath = photoUrl.startsWith("/") ? photoUrl : `/${photoUrl}`;
+    const explicitBackend =
+      process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_API_URL;
+
+    // Prefer browser-side proxy to avoid CORS and keep one origin for assets.
+    if (typeof window !== "undefined" && !explicitBackend) {
+      return `/backend-api${normalizedPath}`;
+    }
+
+    const backendBase = (explicitBackend || "http://localhost:8080").replace(/\/$/, "");
+    return `${backendBase}${normalizedPath}`;
+  };
+
   const [reviews, setReviews] = useState<Review[]>([]);
   const [requestState, setRequestState] = useState(REQUEST_STATE.IDLE);
   const [sortBy, setSortBy] = useState('latest');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [hasMore, setHasMore] = useState(false);
+  const [editingReviewId, setEditingReviewId] = useState<string | null>(null);
+  const [editingReview, setEditingReview] = useState<Review | null>(null);
 
   useEffect(() => {
     loadReviews();
-  }, [entityType, entityId, sortBy, page]);
+  }, [entityType, entityId, sortBy, page, refreshTrigger]);
 
   const loadReviews = async () => {
     setRequestState(REQUEST_STATE.LOADING);
@@ -75,8 +100,9 @@ const ReviewList: React.FC<ReviewListProps> = ({
         page,
         size: 10
       });
-      
-      setReviews(response.items);
+
+      const reviewItems = response?.items || response?.content || [];
+      setReviews(reviewItems);
       setTotalPages(response.totalPages);
       setHasMore(response.hasNext);
       setRequestState(REQUEST_STATE.SUCCESS);
@@ -118,6 +144,41 @@ const ReviewList: React.FC<ReviewListProps> = ({
         isOwner: isOwnerReply
       });
       setReviews(reviews.map(r => r.id === reviewId ? updatedReview : r));
+    } catch (error) {
+      throw error;
+    }
+  };
+
+  const handleEditClick = (review: Review) => {
+    setEditingReview(review);
+    setEditingReviewId(review.id);
+  };
+
+  const handleEditSave = async (updatedData: { rating: number, text: string, photos?: string[] }) => {
+    if (!editingReview || !currentUserId) return;
+    
+    try {
+      const updated = await updateReview(editingReview.id, currentUserId, {
+        entityId: editingReview.entityId,
+        entityType: editingReview.entityType,
+        rating: updatedData.rating,
+        text: updatedData.text,
+        photos: updatedData.photos
+      });
+      setReviews(reviews.map(r => r.id === editingReview.id ? updated : r));
+      setEditingReviewId(null);
+      setEditingReview(null);
+    } catch (error) {
+      throw error;
+    }
+  };
+
+  const handleDeleteReview = async (reviewId: string) => {
+    if (!currentUserId || !window.confirm('Are you sure you want to delete this review?')) return;
+    
+    try {
+      await deleteReview(reviewId, currentUserId);
+      setReviews(reviews.filter(r => r.id !== reviewId));
     } catch (error) {
       throw error;
     }
@@ -189,6 +250,24 @@ const ReviewList: React.FC<ReviewListProps> = ({
                 <span className="text-xs text-gray-400">
                   {new Date(review.createdAt).toLocaleDateString()}
                 </span>
+                {currentUserId === review.userId && (
+                  <>
+                    <button
+                      onClick={() => handleEditClick(review)}
+                      className="p-1 hover:bg-blue-100 rounded text-blue-600"
+                      title="Edit review"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteReview(review.id)}
+                      className="p-1 hover:bg-red-100 rounded text-red-600"
+                      title="Delete review"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </>
+                )}
                 <FlagButton
                   reviewId={review.id}
                   userId={currentUserId}
@@ -209,7 +288,7 @@ const ReviewList: React.FC<ReviewListProps> = ({
                 {review.photos.map((photo, index) => (
                   <img
                     key={index}
-                    src={photo}
+                    src={resolvePhotoUrl(photo)}
                     alt={`Review photo ${index + 1}`}
                     className="w-24 h-24 object-cover rounded-md border border-gray-200"
                   />
@@ -262,6 +341,18 @@ const ReviewList: React.FC<ReviewListProps> = ({
             Next
           </button>
         </div>
+      )}
+
+      {/* Edit Review Modal */}
+      {editingReview && (
+        <EditReviewModal
+          review={editingReview}
+          onClose={() => {
+            setEditingReviewId(null);
+            setEditingReview(null);
+          }}
+          onSave={handleEditSave}
+        />
       )}
     </div>
   );

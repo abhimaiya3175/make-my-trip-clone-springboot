@@ -95,6 +95,15 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
     setRequestState(REQUEST_STATE.LOADING);
 
     try {
+      const token =
+        typeof window !== "undefined" && localStorage
+          ? localStorage.getItem("authToken")
+          : null;
+
+      if (!token) {
+        throw new Error("Authentication required. Please login again.");
+      }
+
       const uploadedUrls: string[] = [];
       for (const file of photos) {
         const formData = new FormData();
@@ -102,6 +111,9 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
 
         const res = await fetch(`${API_BASE}/api/reviews/upload-photo`, {
           method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
           body: formData,
         });
         

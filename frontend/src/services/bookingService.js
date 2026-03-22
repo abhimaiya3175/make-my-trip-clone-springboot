@@ -25,21 +25,26 @@ export const handleflightbooking = async (userId, flightId, seats, price, date, 
     const res = await api.post(url);
     return res.data;
   } catch (error) {
-    console.log(error);
+    console.error("Flight booking error:", error);
+    throw error;
   }
 };
 
-export const handlehotelbooking = async (userId, hotelId, rooms, price, date) => {
+export const handlehotelbooking = async (userId, hotelId, rooms, price, date, roomNumbers = []) => {
   try {
     let url = `/api/bookings/hotel?userId=${userId}&hotelId=${hotelId}&rooms=${rooms}&price=${price}`;
     if (date) {
       const dateStr = typeof date === 'string' ? date.substring(0, 10) : date;
       url += `&date=${dateStr}`;
     }
+    if (Array.isArray(roomNumbers) && roomNumbers.length > 0) {
+      url += `&roomNumbers=${encodeURIComponent(roomNumbers.join(","))}`;
+    }
     const res = await api.post(url);
     return res.data;
   } catch (error) {
-    console.log(error);
+    console.error("Hotel booking error:", error);
+    throw error;
   }
 };
 
