@@ -24,6 +24,13 @@ A full-stack travel booking application built with Spring Boot (Java 17) backend
 - Dynamic Pricing Engine: done
 - AI Recommendations: done
 
+## Recent Stability Updates (March 2026)
+
+- Review publish visibility fixed: frontend review list now reads paginated `items` from backend `PageResponse` (with fallback support).
+- Review entity typing hardened: frontend normalizes `entityType` to `FLIGHT`/`HOTEL` for create, update, and fetch calls.
+- Duplicate review submission behavior improved: backend now updates the existing user review for the same entity instead of failing with 400.
+- Review UX improved across flight/hotel pages: list refreshes immediately after successful create/update.
+
 ## Task Audit
 
 - [x] True file upload for photos
